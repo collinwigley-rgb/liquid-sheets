@@ -4,3 +4,7 @@ dist/
 *.log
 scratch/
 verify/fixtures*/
+
+# Python bytecode
+__pycache__/
+*.pyc

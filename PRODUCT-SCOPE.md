@@ -58,15 +58,15 @@ Buckets: **AS-IS** (port faithfully) / **GENERALIZED** (survives, reshaped for a
 
 ## AI co-pilot
 
-Resolved at ratification via [ADR-0004](docs/adr/0004-one-app-plus-post-launch-power-kit.md): one app, never two versions; the AI-savvy path ships as a post-launch "power kit" in the same repo.
+Resolved at ratification via [ADR-0004](docs/adr/0004-one-app-plus-post-launch-power-kit.md): one app, never two versions; the AI-savvy path ships as a post-launch "power kit" in the same repo. Refined 2026-08-25 by [ADR-0006](docs/adr/0006-ai-copilot-self-hosted-companion-not-in-app.md): the live read is NOT an in-app BYO-key feature; it ships as an optional self-hosted companion server, and the hosted app stays AI-free.
 
 | Feature | Bucket | Rationale |
 |---|---|---|
-| Deterministic flow read (runs, temperature, crunch, hoarders, pace) | GENERALIZED | Contains no AI; it is pure ledger heuristics and ports as ordinary code. Keeps the co-pilot panel alive without any API key |
-| Pre-computed AI opinions shipped in-app | CUT | We never ship AI-generated takes on real players; users generate their own via the power kit and import them |
-| Opinions/tags import hook | GENERALIZED | Small v1 hook so power-kit output (user-generated opinions, tags) flows onto the board; keeps the deferred rows from being foreclosed |
-| Live "reading the room" (BYO Anthropic API key in-app) | DEFERRED | Genuinely differentiating, but v1 ships without any API-key UX; the panel's third slot stays open |
-| Power kit (published co-pilot and opinion-sweep prompts, personal-use ingestion scripts, BYO-AI walkthrough) | DEFERRED | The post-launch encore per [ADR-0004](docs/adr/0004-one-app-plus-post-launch-power-kit.md); per-script licensing posture decided in Phase 2 |
+| Deterministic flow read (runs, temperature, crunch, hoarders, pace) | SHIPS | Contains no AI; pure ledger heuristics, ported as ordinary code. Lives in the top-bar pressure strip and needs no key |
+| Pre-computed AI opinions shipped in-app | CUT | We never ship AI-generated takes on real players; users generate their own and import them via the tags/opinions hook |
+| Opinions/tags import hook | SHIPS | Path E writes to `doc.tags`, which feeds the Flagged Players panel, the player modal profile block, and The Call's tag chips; the app ships none of its own |
+| Live "reading the room" | SELF-HOST ONLY | Resolved by [ADR-0006](docs/adr/0006-ai-copilot-self-hosted-companion-not-in-app.md): no in-app key UX. The hosted app is AI-free; developers run `copilot-server/` against their own AI and set `app/config.js` `AI_ENDPOINT` |
+| Power kit (published copilot server + prompts, personal-use ingestion scripts) | PARTIAL | `copilot-server/` (server + the synthesize/complement prompts) now ships in-repo; the ingestion scripts remain a post-launch encore per [ADR-0004](docs/adr/0004-one-app-plus-post-launch-power-kit.md) |
 
 ## What the wizard must therefore cover (input to Phase 2)
 

@@ -63,8 +63,10 @@ Parent: [PHASE-4.md](PHASE-4.md). Source of truth being harvested: `levi-sheet/d
 ## Round plan
 
 - **M3.2: LANDED in V11 (2026-08-19).** Items 3, 5-15 ported, plus more than planned: light-set tokens adopted wholesale (item 1's light half), board colhead with sortable usd/deal (item 18's sort half), and the player modal's core (item 16, minus profile layer). Chip micro-viz (item 4) also landed. Screenshot review pending.
-- **M4: tokens first, then everything that styles against them.** Items 1-2, 4, 16-24, plus Bucket B's envelopes, run selector, K/DEF column UI, print view.
-- **Post-draft sweep (after ~Sept 6): diff the frozen original against this table**, harvest V37+ additions, close the plan.
+- **M4 parity pass: LANDED at V15 (2026-08-25).** The predecessor had moved to V56; this pass closed the gap in one continuous build. Ported: dark theme + `#rail` re-scoping (item 1 dark half) and `pFLX` (item 2); the plan/envelope layer (`myPlanState`/`planFit` in `app/plan.js`, plan-aware The Call with `.cslots`/`.ctags`, roster purse row, an editable envelope editor with named variants) [Bucket B]; the deterministic flow strip (item 22); the TEAMS grid + board tabs (items 19-20); flagged players fed by `doc.tags` (item 21); collapsible position columns (item 17); the modal profile block (item 16, now complete); the run selector plus a generalized named-bets ("blend+calls") run (Bucket B); the gear merge with theme toggle, under-the-hood tabbed explainer, and 2-step reset (items 23-24); and the V37-V56 deltas: reopen-last-sale (button + double-Escape) replacing UNDO LAST, and the owner-grid type-to-filter. NOTE the owner-ledger manager/team toggle (item 13's missing half) is intentionally omitted: the public league model has one name per team, so there is nothing to toggle between.
+  - **AI (Bucket C) resolved by [ADR-0006](../docs/adr/0006-ai-copilot-self-hosted-companion-not-in-app.md):** not in the hosted app. The client `#liveread`/`stageCopilot` (`app/copilot.js`) is gated behind `config.AI_ENDPOINT` and never loads in the hosted build; the server half ships as `copilot-server/`.
+  - **Deferred, not dropped:** the K/DEF column keeps Sleeper data (Bucket B, done); print view and the pre-draft knapsack optimizer are not in this pass.
+- **Post-draft sweep (after ~Sept 6): diff the frozen predecessor (V57+) against this table**, harvest additions, close the plan.
 
 ## Phase 4B (queued after Phase 4): Liquid Workflows brand pass
 

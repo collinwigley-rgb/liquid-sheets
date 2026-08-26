@@ -12,6 +12,8 @@ import { PRIOR, PRIOR_SEASON } from "./prior_2026.js";
 import { loadDoc, saveDoc, wipeDoc, newDoc, exportDoc, importDocFile }
   from "./storage.js";
 import { fetchSleeper } from "./sleeper.js";
+import { myPlanState, planFit, defaultPlan } from "./plan.js";
+import { AI_ENABLED, AI_ENDPOINT } from "./config.js";
 
 let doc = null;
 const $ = (sel) => document.querySelector(sel);
@@ -65,6 +67,7 @@ const STEPS = ["League", "Roster", "Scoring", "Teams", "Data"];
 function renderWizard() {
   const root = $("#main");
   root.innerHTML = "";
+  const tc = $("#topchips"); if (tc) tc.innerHTML = "";   // chips are board-only
   const box = el("div", "wizard");
   const crumbs = el("div", "crumbs");
   STEPS.forEach((s, i) => {
@@ -301,6 +304,7 @@ function boardRoster() {
 function renderImport() {
   const root = $("#main");
   root.innerHTML = "";
+  const tc = $("#topchips"); if (tc) tc.innerHTML = "";   // chips are board-only
   const panel = el("div", "bigpanel");
   root.appendChild(panel);
   panel.appendChild(el("h2", null, "Add data"));
@@ -566,14 +570,39 @@ async function finishImport() {
 
 let P = [], byId = {}, soldSet = new Set(), soldBy = {};
 let hitList = [], hitSel = 0, picked = null, selOwner = null;
-let stagedId = null, rosterView = null, showTeams = false, kdefView = "K";
+let stagedId = null, rosterView = null, showTeams = false;
+let kdefView = localStorage.getItem("ls-kdef") || "DEF";
 let sortBy = localStorage.getItem("ls-sort") || "usd";
 let mScale = 1;
 let curRun = null, curSales = [];
+/* any board column can collapse to a slim strip; persisted (ported) */
+let colMin = JSON.parse(localStorage.getItem("ls-colmin") || "{}");
+if (!("KDEF" in colMin)) colMin.KDEF = true;  // K/DEF collapsed until toggled
+let ownerFilter = "";                          // type-to-filter the owner grid
+let boardTab = localStorage.getItem("ls-tab") || "board";
+let notesExpanded = false;
+let flaggedOpen = localStorage.getItem("ls-flagged") === "open";
+let lastEsc = 0;                               // double-tap Escape timer
+let cp = null;   // copilot handle, non-null only when config.AI_ENDPOINT is set
+
+/* research flag tags (ported). Fed by user-entered / power-kit-imported tags in
+ * doc.tags; the app ships none of its own. */
+const POS_TAGS = { contract_year: 1, breakout_camp: 1, volume_locked: 1 };
+const NEG_TAGS = { injury_watch: 1, suspension: 1, holdout: 1,
+  committee_risk: 1, age_cliff: 1, rookie_role_unclear: 1,
+  returning_from_injury: 1 };
 
 const fmt$ = (v) => v == null ? "" : "$" + Math.round(v);
 const posClass = (l) => ({ QB: "pQB", RB: "pRB", WR: "pWR", TE: "pTE",
-  K: "pK", DEF: "pDEF" }[l] || "");
+  FLX: "pFLX", K: "pK", DEF: "pDEF" }[l] || "");
+const tagsOf = (pid) => (doc.tags && doc.tags[pid]) || null;
+
+function applyTheme() {
+  /* dark is the default; light removes the attribute, any dark* theme sets it */
+  const t = doc?.ui?.theme || "dark";
+  if (t === "light") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = "dark";
+}
 const owners = () => doc.league.team_names.map((name, i) =>
   ({ id: i, name, is_me: i === 0 }));
 const short = (o) => o.is_me ? "ME"
@@ -600,8 +629,43 @@ function slotOrder() {
   return out;
 }
 
+/* My Calls: a personal dollar nudge on a player's board value. Stored per player
+ * in doc.calls as {pid, delta}; set from the player popup with +/- steppers. */
+function callOf(pid) {
+  const c = (doc.calls || []).find((x) => x.pid === pid);
+  return c ? (c.delta || 0) : 0;
+}
+
+/* derive the "blend + My Calls" run on the fly from the latest base run
+ * (never persisted; regenerates whenever a call changes). The nudge is a direct
+ * dollar delta on our$; the base blend is never touched. */
+function deriveCallsRun(base) {
+  const delta = {};
+  for (const c of (doc.calls || [])) if (c.pid) delta[c.pid] = c.delta || 0;
+  const players = base.players.map((p) => {
+    const d = delta[p.player_id] || 0;
+    return d
+      ? { ...p, dollar: Math.max(1, Math.round((p.dollar + d) * 10) / 10) }
+      : p;
+  });
+  return { run_id: "calls", source_label: base.source_label + "+calls",
+    as_of: base.as_of, meta: base.meta, players };
+}
+
 function buildModel() {
-  curRun = doc.runs[doc.runs.length - 1] ?? null;
+  const baseReal = doc.runs[doc.runs.length - 1] ?? null;
+  if (doc.ui?.run === "calls" && (doc.calls || []).length && baseReal) {
+    curRun = deriveCallsRun(baseReal);
+  } else {
+    curRun = doc.runs.find((r) => r.run_id === doc.ui?.run) ?? baseReal;
+  }
+  /* attach a generic, editable plan the first time a run exists (never the
+   * author's numbers; derived from the run's own chalk values). */
+  if (curRun && doc.league && !doc.league.plan) {
+    doc.league.plan = defaultPlan(curRun.players, slotOrder(),
+      doc.league.budget);
+    saveDoc(doc);
+  }
   curSales = activeSales(doc.journal);
   soldSet = new Set(curSales.map((s) => s.pid));
   soldBy = {}; curSales.forEach((s) => { soldBy[s.pid] = s; });
@@ -667,13 +731,39 @@ function ownerNeedMap() {
   return map;
 }
 
+/* unsold auction values per position, sorted high to low (plan ceilings) */
+function unsoldByPos() {
+  const out = { QB: [], RB: [], WR: [], TE: [], K: [], DEF: [] };
+  for (const p of P) {
+    if (soldSet.has(p.id) || p.usd == null) continue;
+    if (out[p.pos]) out[p.pos].push(Math.max(1, Math.round(p.usd)));
+  }
+  for (const k of Object.keys(out)) out[k].sort((a, b) => b - a);
+  return out;
+}
+
+/* my live plan state (envelopes water-filled to remaining budget). Owner 0 is
+ * always "me" (team_names[0]); ported from the personal tool's is_me model. */
+function planState() {
+  const mine = curSales.filter((s) => s.owner === 0)
+    .map((s) => ({ pos: (byId[s.pid] || {}).pos || s.pos, price: s.price,
+      name: s.name }));
+  const plan = doc.league.plan || null;
+  return myPlanState({
+    env: plan ? plan.envelopes : null,
+    purseCfg: plan ? plan.purse : null,
+    floatTarget: plan ? plan.float_target : null,
+    budget: doc.league.budget,
+    mine, slotLabels: slotOrder(), unsoldByPos: unsoldByPos(),
+  });
+}
+
 /* BeerSheets-style surplus shading (ported, incl. sqrt scale) */
 function surplusBg(ourVal, price) {
   const d = (ourVal == null ? 1 : ourVal) - price;
   if (Math.abs(d) < 0.5) return "";
   const t = Math.sqrt(Math.min(Math.abs(d), 20) / 20);
-  const dark = !!document.documentElement.dataset.theme &&
-    document.documentElement.dataset.theme !== "focus";
+  const dark = (document.documentElement.dataset.theme || "").startsWith("dark");
   const a = (dark ? 0.08 : 0.05) + t * (dark ? 0.40 : 0.36);
   return d > 0
     ? (dark ? `rgba(102,189,143,${a.toFixed(2)})` : `rgba(13,107,70,${a.toFixed(2)})`)
@@ -692,27 +782,32 @@ function stampShow(big, small) {
 function addRow(p, target, kdef) {
   const sold = soldSet.has(p.id), sale = soldBy[p.id];
   const winner = sale && owners()[sale.owner];
+  const mine = winner && winner.is_me;
   const edge = dealOf(p);
   const row = el("div", "row " + (kdef ? "grid-kdef" : "grid-skill")
-    + (sold ? " sold" : "")
+    + (sold ? (mine ? " sold mine" : " sold") : "")
     + (p.id === stagedId && !sold ? " staged" : ""));
   row.dataset.id = p.id;
   if (sold) row.style.background = surplusBg(kdef ? 1 : p.usd, sale.price);
   if (kdef) {
+    /* K/DEF sold rows show the price + buyer (there is no our$ to keep) */
     row.innerHTML = `<span class="nm">${p.name}</span>`
       + (sold ? `<span class="mkt">${fmt$(sale.price)} ${short(winner)}</span>`
         : `<span class="mkt">${p.y_avg != null ? fmt$(p.y_avg) : "$1"}</span>`);
   } else {
+    /* skill rows always show bid$ / +/- / our$; a sold row keeps our value
+     * (struck through + surplus tint), the buyer shows in the popup (V53) */
+    const bid = p.y_avg != null ? "$" + Math.round(p.y_avg * mScale) : "";
+    const cd = callOf(p.id);
     row.innerHTML =
       `<span class="tier">${p.tier ?? ""}</span>`
       + `<span class="nm">${p.name}<span class="tm">${p.team || ""}</span>`
       + (p.inj ? `<span class="inj" title="${p.inj}">+</span>` : "")
-      + (p.rookie ? `<span class="rk" title="rookie">R</span>` : "") + `</span>`
-      + `<span class="pts">${p.pts != null ? Math.round(p.pts) : ""}</span>`
-      + (sold
-        ? `<span class="edge"></span><span class="usd">${fmt$(sale.price)} ${short(winner)}</span>`
-        : `<span class="edge ${edge > 2 ? "up" : edge < -2 ? "dn" : ""}">${edge == null ? "" : (edge > 0 ? "+" : "") + Math.round(edge)}</span>`
-          + `<span class="usd">${fmt$(p.usd)}</span>`);
+      + (p.rookie ? `<span class="rk" title="rookie">R</span>` : "")
+      + (cd ? `<span class="callm ${cd > 0 ? "up" : "dn"}" title="your call: ${cd > 0 ? "+" : ""}${cd}">${cd > 0 ? "+" : ""}${cd}</span>` : "") + `</span>`
+      + `<span class="pts" title="estimated bid the room pays: your market source's average x the money-supply scale (x${mScale.toFixed(2)})">${bid}</span>`
+      + `<span class="edge ${edge == null ? "" : Math.round(edge) > 0 ? "up" : Math.round(edge) < 0 ? "dn" : ""}" title="${edge == null ? "" : edge > 0 ? "a $" + Math.round(edge) + " deal vs the expected bid" : "$" + Math.round(-edge) + " over our value"}">${edge == null ? "" : (Math.round(edge) > 0 ? "+" : "") + Math.round(edge)}</span>`
+      + `<span class="usd">${fmt$(p.usd)}</span>`;
   }
   /* single click = popup; double click = nominate (ported timing trick) */
   row.onclick = () => {
@@ -724,16 +819,37 @@ function addRow(p, target, kdef) {
   target.appendChild(row);
 }
 
+/* any column can collapse to a slim vertical strip (persisted, ported) */
+function toggleCol(key) {
+  colMin[key] = !colMin[key];
+  localStorage.setItem("ls-colmin", JSON.stringify(colMin));
+  renderBoard();
+}
+function minCol(key, labelHtml, sub) {
+  const col = el("div", "poscol min");
+  col.title = "expand column";
+  col.innerHTML = `<span class="minlab">${labelHtml}${sub ? ` <small>${sub}</small>` : ""}</span>`;
+  col.onclick = () => toggleCol(key);
+  return col;
+}
+
 function skillCol(pos) {
+  if (colMin[pos]) {
+    const left = P.filter((p) => p.pos === pos && !soldSet.has(p.id)
+      && (p.usd || 0) >= 2).length;
+    return minCol(pos, `<b class="${posClass(pos)}">${pos}</b>`, `${left} left`);
+  }
   const col = el("div", "poscol");
   const base = curRun.meta.baselines[pos] ?? "";
-  const dealCols = doc.market ? `<span class="r sortable${sortBy === "deal" ? " on" : ""}" data-sort="deal" title="DEAL: our value minus what the room's market pays (rescaled to your league's money). Green +3: likely bargain. Red -5: the market pays past our value. CLICK to sort by deal.">deal</span>` : `<span></span>`;
   col.innerHTML =
-    `<div class="colhead"><div class="t1"><span class="${posClass(pos)}" title="Position column. Values are computed against replacement baseline ${pos}${base}: the best player assumed freely available.">${pos}</span></div>
+    `<div class="colhead"><div class="t1"><span class="${posClass(pos)}" title="Position column. Values are computed against replacement baseline ${pos}${base}: the best player assumed freely available.">${pos}</span><button class="colbtn" title="collapse this column to a slim strip">&#171;</button></div>
      <div class="t2 grid-skill"><span title="tier: players whose values sit within noise of each other. A tier ends once value has fallen 20% below that tier's own top - one rule that catches both hard cliffs and slow slides. The horizontal rule marks each break.">T</span><span>player</span>
-       <span class="pts" title="projected season points under YOUR league scoring">pts</span>
-       ${dealCols}
+       <span class="pts" title="estimated bid the room pays: your market source's average salary, rescaled to your league's money supply. Blank until you add market values.">bid$</span>
+       <span class="edge sortable${sortBy === "deal" ? " on" : ""}" data-sort="deal" title="our$ minus bid$. GREEN (+) a deal: worth more to us than the room pays. RED (-) the room pays past our value. Blank without market values. CLICK to sort by deal.">+/-</span>
        <span class="r sortable${sortBy === "usd" ? " on" : ""}" data-sort="usd" title="our auction value for this league: the most you should be willing to pay. CLICK to sort by value.">our$</span></div></div>`;
+  col.querySelector(".colbtn").onclick = (e) => {
+    e.stopPropagation(); toggleCol(pos);
+  };
   col.querySelectorAll(".sortable").forEach((s) => {
     s.onclick = (e) => { e.stopPropagation(); sortBy = s.dataset.sort;
       localStorage.setItem("ls-sort", sortBy); renderBoard(); };
@@ -777,16 +893,23 @@ function skillCol(pos) {
 }
 
 function kdefCol() {
+  if (colMin.KDEF) {
+    return minCol("KDEF", `<b class="pK">K</b>/<b class="pDEF">DEF</b>`, "$1");
+  }
   const col = el("div", "poscol");
   col.innerHTML =
     `<div class="colhead"><div class="t1">
        <span class="kd pK${kdefView === "K" ? " on" : ""}" data-kd="K" title="show kickers">K</span> /
        <span class="kd pDEF${kdefView === "DEF" ? " on" : ""}" data-kd="DEF" title="show defenses">DEF</span>
-       <small title="the model prices every K and DEF at $1">$1 rule</small></div>
+       <small title="the model prices every K and DEF at $1">$1 rule</small>
+       <button class="colbtn" title="collapse this column to a slim strip">&#171;</button></div>
      <div class="t2 grid-kdef"><span>player</span><span class="r" title="market average salary, when you have pasted values">mkt$</span></div></div>`;
+  col.querySelector(".colbtn").onclick = (e) => {
+    e.stopPropagation(); toggleCol("KDEF");
+  };
   col.querySelectorAll(".kd").forEach((s) => {
     s.onclick = (e) => { e.stopPropagation(); kdefView = s.dataset.kd;
-      renderBoard(); };
+      localStorage.setItem("ls-kdef", kdefView); renderBoard(); };
   });
   const wrap = el("div", "rows");
   P.filter((p) => p.pos === kdefView)
@@ -801,8 +924,14 @@ function renderBoard() {
   const board = $("#board");
   if (!board) return;
   board.innerHTML = "";
+  const hasKdef = doc.kdef && doc.kdef.players.length;
+  const weights = { QB: "1fr", RB: "1.05fr", WR: "1.05fr", TE: "1fr",
+    KDEF: ".55fr" };
+  const keys = hasKdef ? [...POSITIONS, "KDEF"] : [...POSITIONS];
+  board.style.gridTemplateColumns =
+    keys.map((k) => colMin[k] ? "30px" : weights[k]).join(" ");
   POSITIONS.forEach((pos) => board.appendChild(skillCol(pos)));
-  if (doc.kdef && doc.kdef.players.length) board.appendChild(kdefCol());
+  if (hasKdef) board.appendChild(kdefCol());
 }
 
 /* ---------------- rail renders (ported) ---------------- */
@@ -823,9 +952,13 @@ function renderOwnerGrid() {
   if (!grid) return;
   const os = oStates();
   const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="];
-  grid.innerHTML = os.map((o, i) =>
-    `<button class="obtn${o.is_me ? " me" : ""}${o.max <= 1 ? " out" : ""}${selOwner === o.id ? " selected" : ""}"
-      data-oid="${o.id}" title="${o.name} (key: ${keys[i] ?? ""})"><span>${o.name}</span><small>$${o.left}</small></button>`).join("");
+  grid.innerHTML = os.map((o, i) => {
+    const fcls = ownerFilter
+      ? (o.name.toLowerCase().startsWith(ownerFilter) ? " hit" : " dim") : "";
+    return `<button class="obtn${o.is_me ? " me" : ""}${o.max <= 1 ? " out" : ""}${selOwner === o.id ? " selected" : ""}${fcls}"
+      data-oid="${o.id}" title="${o.name}: $${o.left} bank, max bid $${o.max} (key: ${keys[i] ?? ""})">${o.name}</button>`;
+  }).join("")
+    + (ownerFilter ? `<div id="ofilter">${ownerFilter}</div>` : "");
   grid.querySelectorAll(".obtn").forEach((b) =>
     b.onclick = () => selectOwner(+b.dataset.oid));
 }
@@ -856,13 +989,31 @@ function renderRoster() {
       .join("");
     sel.value = String(viewId);
   }
-  const os = ownerSlots(viewId);
-  $("#roster").innerHTML = os.slots.map((s) =>
+  /* another team's roster: filled slots + money left, no plan projections */
+  if (viewId !== 0) {
+    const os = ownerSlots(viewId);
+    const oleft = doc.league.budget - os.spent;
+    $("#roster").innerHTML = os.slots.map((s) =>
+      `<div class="slot${s.who ? " filled" : ""}"><span class="lab ${posClass(s.lab)}">${s.lab}</span>
+        <span class="who">${s.who ? s.who.name : ""}</span>
+        <span class="pr">${s.who ? fmt$(s.price) : ""}</span></div>`).join("")
+      + `<div class="slot"><span class="lab"></span><span class="who">left</span>
+         <span class="pr" title="spent $${os.spent} of $${doc.league.budget}">${fmt$(oleft)}</span></div>`;
+    return;
+  }
+  /* my roster: envelopes water-filled to remaining budget + purse row */
+  const ps = planState();
+  $("#roster").innerHTML = ps.slots.map((s) =>
     `<div class="slot${s.who ? " filled" : ""}"><span class="lab ${posClass(s.lab)}">${s.lab}</span>
       <span class="who">${s.who ? s.who.name : ""}</span>
-      <span class="pr">${s.who ? fmt$(s.price) : ""}</span></div>`).join("")
-    + `<div class="slot"><span class="lab"></span><span class="who">spent</span>
-       <span class="pr">$${os.spent} / ${doc.league.budget}</span></div>`;
+      <span class="pr">${s.who ? fmt$(s.price)
+      : (ps.hasPlan
+        ? (s.lab === "BN"
+          ? `<span class="pl" title="estimated budget left for this bench spot as the plan flexes">~${fmt$(s.eff ?? ps.benchPer)}</span>`
+          : `<span class="pl ${posClass(s.lab)}" title="plan for this slot: $${s.planned}${s.eff != null && s.eff !== s.planned ? " - flexed to your remaining budget (grows when you bank deals, shrinks when you overspend)" : ""}, capped at the best remaining value for the slot">~${fmt$(s.eff ?? s.planned)}</span>`)
+        : "")}</span></div>`).join("")
+    + `<div class="slot"><span class="lab"></span><span class="who">left</span>
+       <span class="pr" title="spent $${ps.spent} of $${doc.league.budget}">${fmt$(ps.left)}</span></div>`;
 }
 
 function renderChips() {
@@ -875,24 +1026,6 @@ function renderChips() {
     <span class="cval"><b>${inf.ratio.toFixed(2)}</b>
     <span class="g">$${inf.money}</span><span>/ $${Math.round(inf.value)}</span></span>
     <span class="gauge" title="dot vs center tick: right of center = money-rich room (overpays coming), left = money drying up (deals coming)"><i style="left:${pct.toFixed(1)}%"></i></span>`;
-  const total = doc.league.teams * rosterSpots(doc.league.full_roster);
-  $("#soldct").innerHTML = `<span class="lab">sold</span>
-    <span class="cval"><b>${curSales.length}</b><span>/${total}</span></span>
-    <span class="bar"><i style="width:${(curSales.length / total * 100).toFixed(1)}%"></i></span>`;
-  const recent = curSales.slice(-5)
-    .map((s) => s.price - Math.max((byId[s.pid] && byId[s.pid].usd) || 1, 1));
-  if (recent.length) {
-    const avg = recent.reduce((a, b) => a + b, 0) / recent.length;
-    const mood = avg > 1 ? "hot" : avg < -1 ? "deals" : "even";
-    const col = avg > 1 ? "var(--warn)" : avg < -1 ? "var(--good)"
-      : "var(--c-text)";
-    $("#heat").innerHTML = `<span class="lab">last 5 sales</span>
-      <span class="cval"><b style="color:${col}">${avg >= 0 ? "+" : "-"}$${Math.abs(avg).toFixed(0)} ${mood}</b></span>
-      <span class="segs">${recent.map((d) =>
-    `<i style="background:${d > 0 ? "var(--bad)" : "var(--good)"};opacity:${(Math.min(Math.abs(d), 12) / 12 * 0.75 + 0.25).toFixed(2)}"></i>`).join("")}</span>`;
-  } else {
-    $("#heat").innerHTML = `<span class="lab">last 5 sales</span><b>none yet</b>`;
-  }
   const last = curSales[curSales.length - 1];
   if (last) {
     $("#lastchip").innerHTML = `<span class="lab">last sale</span>
@@ -903,6 +1036,130 @@ function renderChips() {
   const mast = $("#spendline");
   mast.textContent = `${doc.league.teams} TEAMS X $${doc.league.budget}` +
     (doc.market ? ` X MARKET ${mScale.toFixed(2)}` : "");
+}
+
+/* ---------------- flagged players (ported) ----------------
+ * Flags come from user-entered / power-kit-imported research tags in doc.tags
+ * ONLY, never derived from our-value vs market discrepancies (doctrine R3). The
+ * app ships no tags of its own, so the panel is empty until a user adds them. */
+function renderNotes() {
+  const box = $("#notes");
+  if (!box) return;
+  const items = P
+    .filter((p) => (tagsOf(p.id)?.tags || []).length && (p.usd || 0) >= 2
+      && !soldSet.has(p.id))
+    .map((p) => {
+      const tg = tagsOf(p.id).tags;
+      const pos = tg.filter((t) => POS_TAGS[t]).length;
+      const neg = tg.filter((t) => NEG_TAGS[t]).length;
+      return { p, tg, pos, neg, impact: (pos + neg) * (p.usd || 1) };
+    })
+    .filter((x) => x.pos + x.neg > 0)
+    .sort((a, b) => b.impact - a.impact);
+  $("#flaggedcount").textContent = items.length ? ` (${items.length})` : "";
+  $("#flaggedcaret").style.transform = flaggedOpen ? "rotate(90deg)" : "";
+  box.style.display = flaggedOpen ? "" : "none";
+  if (!flaggedOpen) return;
+  const shown = notesExpanded ? items : items.slice(0, 24);
+  box.innerHTML = (shown.map((x) => {
+    const tip = x.tg.join(", ").replace(/_/g, " ");
+    return `<button class="note" data-id="${x.p.id}" data-tip="${tip}">
+      <span class="flag ${x.neg && x.pos ? "mix" : x.neg ? "dn" : "up"}">${x.neg && x.pos ? "+/-" : x.neg ? "-" : "+"}</span>
+      <span class="n">${x.p.name}<span class="tm ${posClass(x.p.pos)}">${x.p.pos}</span></span>
+      <span class="d">${fmt$(x.p.usd)}</span></button>`;
+  }).join("")
+    + (items.length > 24
+      ? `<button class="more" id="notesmore" style="padding:6px 2px">${notesExpanded ? "- collapse" : `+ ${items.length - 24} more...`}</button>` : ""))
+    || `<div style="color:var(--faint);font-size:12px">no flagged players. Import research tags or notes to see them here.</div>`;
+  box.querySelectorAll(".note").forEach((b) =>
+    b.onclick = () => openModal(b.dataset.id));
+  const nm = $("#notesmore");
+  if (nm) nm.onclick = () => { notesExpanded = !notesExpanded; renderNotes(); };
+}
+
+/* ---------------- positional pressure strip (deterministic, ported) ----------
+ * Per position, need/left = starter slots still unfilled league-wide vs
+ * startable ($5+) players remaining. Amber = window closing, red = crunch. */
+function renderFlow() {
+  const flow = $("#flow");
+  if (!flow) return;
+  const n = curSales.length;
+  const runPos = new Set();
+  if (n >= 4) {
+    const last6 = curSales.slice(-6).map((s) => (byId[s.pid] || {}).pos);
+    const counts = {};
+    last6.forEach((pp) => { counts[pp] = (counts[pp] || 0) + 1; });
+    for (const [pos, c] of Object.entries(counts)) {
+      if (c >= 4 && POSITIONS.includes(pos)) runPos.add(pos);
+    }
+  }
+  const needs = ownerNeedMap();
+  const cells = POSITIONS.map((pos) => {
+    const demand = Object.values(needs).reduce((a, x) => a + x[pos], 0);
+    const supply = P.filter((p) => p.pos === pos && !soldSet.has(p.id)
+      && (p.usd || 0) >= 5).length;
+    const margin = supply - demand;
+    const cls = demand > supply ? " crunch" : margin <= 2 ? " tight" : "";
+    const run = runPos.has(pos)
+      ? `<i class="runmark" title="${pos} run: 4+ of the last 6 sales">&#9650;</i>` : "";
+    const iNeed = needs[0][pos] > 0
+      || (["RB", "WR", "TE"].includes(pos) && needs[0].FLX > 0);
+    const dot = cls ? `<i class="mdot ${iNeed ? "exposed" : "exploit"}"></i>` : "";
+    const stance = !cls ? ""
+      : iNeed ? " YOU STILL NEED THIS SLOT: act before the music stops; do not nominate your own target."
+        : " Your slot is filled: nominate this position to drain the needers' budgets.";
+    const state = demand > supply ? " - CRUNCH: someone goes without; the last startable ones sell at a premium."
+      : margin <= 2 ? " - window closing." : "";
+    return `<span class="fcell${cls}" title="${pos}: ${demand} starter slots still needed league-wide vs ${supply} startable ($5+) players left${state}${stance}${runPos.has(pos) ? " RUN in progress: wait out your target or feed it a player you don't want." : ""}">`
+      + `<span class="${posClass(pos)}">${pos}</span><b>${demand}/${supply}</b>${dot}${run}</span>`;
+  });
+  const extras = [];
+  const hoard = oStates().filter((o) => !o.is_me && o.left >= 100 && o.open <= 9)
+    .sort((a, b) => b.left - a.left);
+  const spots = doc.league.teams * rosterSpots(doc.league.full_roster);
+  if (n > spots * 0.2 && hoard.length) {
+    extras.push(`<span class="fcell tight" title="cash hoarders strike late: your cheap deals will get contested by these wallets">hoard <b>${hoard.slice(0, 2).map((o) => `${o.name} $${o.left}`).join(", ")}</b></span>`);
+  }
+  if (n >= 20) {
+    const ps = planState();
+    const startersFilled = ps.slots.filter((s) => s.starter && s.who).length;
+    const nStart = ps.slots.filter((s) => s.starter).length;
+    const pace = n / spots;
+    if (nStart > 0 && startersFilled / nStart < pace - 0.25) {
+      extras.push(`<span class="fcell crunch" title="${Math.round(pace * 100)}% of the draft is sold and you hold ${startersFilled} of ${nStart} starters: discipline is becoming stranding - start winning bids">pace <b>${startersFilled}/${nStart}</b></span>`);
+    }
+  }
+  flow.innerHTML = cells.join("") + extras.join("");
+}
+
+/* ---------------- teams grid (ported) ---------------- */
+function renderTeams() {
+  const box = $("#teams");
+  if (!box) return;
+  const os = oStates();
+  box.innerHTML = `<div id="tgrid">` + owners().map((o) => {
+    const st = os.find((x) => x.id === o.id);
+    const tiles = curSales.filter((s) => s.owner === o.id).map((s) => {
+      const p = byId[s.pid]; if (!p) return "";
+      return `<div class="ttile posbg-${p.pos}" data-id="${p.id}">
+        <div class="tn ${posClass(p.pos)}">${p.name}</div>
+        <div class="tmeta"><span><span class="${posClass(p.pos)}">${p.pos}</span> &middot; ${p.team || ""}</span><b>$${s.price}</b></div></div>`;
+    }).join("");
+    return `<div class="tcol${o.is_me ? " meCol" : ""}">
+      <div class="thead">${o.is_me ? "You" : o.name}<small>$${st.left} left &middot; ${st.open} open</small></div>
+      ${tiles}</div>`;
+  }).join("") + `</div>`;
+  box.querySelectorAll(".ttile").forEach((t) =>
+    t.onclick = () => openModal(t.dataset.id));
+}
+
+function applyTab() {
+  const b = $("#board"), t = $("#teams");
+  if (!b || !t) return;
+  b.style.display = boardTab === "board" ? "grid" : "none";
+  t.style.display = boardTab === "teams" ? "block" : "none";
+  document.querySelectorAll(".btab").forEach((x) =>
+    x.classList.toggle("on", x.dataset.tab === boardTab));
 }
 
 /* ---------------- sale flow (ported) ---------------- */
@@ -928,14 +1185,14 @@ function renderHits() {
 }
 
 function pick(pid) {
-  picked = byId[pid]; selOwner = null;
+  picked = byId[pid]; selOwner = null; ownerFilter = "";
   hitList = []; renderHits(); $("#q").value = "";
   const p = picked;
   $("#picked").style.display = "block";
   $("#picked").innerHTML = `<div class="pnm">${p.name} <span class="${posClass(p.pos)}">${p.pos}</span> <span style="color:var(--faint)">${p.team || ""}</span>${p.inj ? ' <span style="color:var(--bad);font-size:12px">' + p.inj + "</span>" : ""}</div>`;
-  $("#saleform").style.display = "block";
   $("#price").value = ""; $("#msg").textContent = "";
   renderCall(p);
+  stageCopilot(p);
   stagedId = p.id;
   document.querySelectorAll(".row.staged").forEach((r) =>
     r.classList.remove("staged"));
@@ -945,13 +1202,17 @@ function pick(pid) {
   $("#price").focus();
 }
 
-/* the call: deterministic advisor (ported; plan-fit inputs land in M4) */
+/* the call: deterministic advisor (ported, now plan-aware). Synthesizes every
+ * live metric plus the plan envelopes into one verdict + max price. Pure logic
+ * over the same numbers on screen: traceable, instant, works offline (R1). */
 function advise(p) {
+  const ps = planState();
+  const fit = planFit(p, ps);
   const inf = inflation();
   const deal = dealOf(p);
   const est = (doc.market && p.y_avg != null)
     ? Math.max(1, Math.round(p.y_avg * mScale * inf.ratio)) : null;
-  const val = p.usd != null ? Math.round(p.usd) : 1;
+  const val = p.usd != null ? Math.max(1, Math.round(p.usd)) : 1;
   const myMax = oStates().find((o) => o.is_me).max;
   const reasons = [];
 
@@ -970,24 +1231,40 @@ function advise(p) {
     && (needs[o.id][p.pos] > 0
       || (["RB", "WR", "TE"].includes(p.pos) && needs[o.id].FLX > 0))).length;
 
-  let cls, label, max;
+  /* envelope status rows for the eligible open slots (mirrors My Roster) */
+  const elig = ["K", "DEF"].includes(p.pos) ? [] : ps.openStarters.filter((s) =>
+    s.lab === p.pos
+    || (s.lab === "FLX" && ["RB", "WR", "TE"].includes(p.pos)));
+
+  let cls, label, max, planCap;
   if (p.pos === "K" || p.pos === "DEF") {
-    cls = "bench"; label = "$1 RULE"; max = 1;
+    cls = "bench"; label = "$1 RULE"; max = 1; planCap = 1;
     reasons.push("kickers and defenses are $1 players; never bid $2");
+  } else if (fit && fit.bench) {
+    cls = "pass"; label = "BENCH ONLY"; max = Math.min(2, myMax);
+    planCap = Math.max(1, Math.min(ps.benchPer, myMax));
+    reasons.push((ps.benchOpen > 0
+      ? "no starting slot open for him; bench money ~$" + ps.benchPer
+        + " across " + ps.benchOpen + " spot" + (ps.benchOpen === 1 ? "" : "s")
+      : "no roster spot open for him")
+      + (ps.openStarters.length ? "; starters still open: "
+        + ps.openStarters.map((s) => s.lab).join(" ") : ""));
   } else {
+    const envMax = fit ? fit.max : val;
+    planCap = Math.min(envMax, myMax);
     const cliffPressure = comparable != null && comparable <= 2 && contest >= 2
       && (drop == null || drop >= 8);
     if (deal != null && deal <= -4 && !cliffPressure) {
-      cls = "pass"; label = "LET HIM GO"; max = val;
+      cls = "pass"; label = "LET HIM GO"; max = Math.min(val, envMax);
     } else if (cliffPressure) {
       cls = "last"; label = "LAST CHANCE"; max = val;
       reasons.push(`only ${comparable} comparable ${p.pos}s left`
         + (drop != null ? ` before a $${drop} drop` : "")
         + ` and ${contest} funded owners still need one; paying full value is correct here`);
     } else if (deal != null && deal >= 2) {
-      cls = "target"; label = "TARGET"; max = val;
+      cls = "target"; label = "TARGET"; max = Math.min(val, envMax);
     } else {
-      cls = "value"; label = "FAIR VALUE"; max = val;
+      cls = "value"; label = "FAIR VALUE"; max = Math.min(val, envMax);
     }
     if (comparable != null && !cliffPressure) {
       reasons.push(`${comparable} comparable ${p.pos}s left, `
@@ -1000,19 +1277,88 @@ function advise(p) {
     reasons.push(`money drying up (x${inf.ratio.toFixed(2)}): patience is being paid`);
   }
   if (p.inj) reasons.push("injury status: " + p.inj);
-  return { cls, label, max: Math.max(1, Math.min(max, myMax)), est, reasons };
+  return { cls, label, max: Math.max(1, Math.min(max, myMax)), worth: val,
+    planCap, benchPer: ps.benchPer, benchOpen: ps.benchOpen, est, reasons,
+    elig, tags: (tagsOf(p.id)?.tags) || [] };
 }
 
 function renderCall(p) {
   const a = advise(p);
+  const slotRows = a.elig.length
+    ? `<div class="cslots">${a.elig.map((s) =>
+      `<div class="srow"><span class="lab ${posClass(s.lab)}">${s.lab}</span>
+       <span class="pl ${posClass(s.lab)}">~${fmt$(s.eff ?? s.planned)}</span></div>`).join("")}</div>`
+    : (POSITIONS.includes(p.pos) && a.benchOpen > 0 && a.benchPer > 0
+      ? `<div class="cslots"><div class="srow"><span class="lab">BN</span>
+         <span class="pl">~${fmt$(a.benchPer)}</span></div></div>`
+      : "");
+  const tagChips = a.tags.length
+    ? `<div class="ctags">${a.tags.map((t) =>
+      `<span class="${NEG_TAGS[t] ? "tneg" : POS_TAGS[t] ? "tpos" : ""}">${t.replace(/_/g, " ")}</span>`).join("")}</div>`
+    : "";
   $("#call").style.display = "block";
   $("#call").innerHTML = `<span class="cverdict ${a.cls}">${a.label}</span>
-    <div class="cmax" title="the break-even ceiling from our value model - past this you provably overpaid.">worth up to <b>$${a.max}</b>${a.est ? ` <span>room likely pays ~$${a.est}</span>` : ""}</div>
-    <ul>${a.reasons.slice(0, 5).map((r) => `<li>${r}</li>`).join("")}</ul>`;
+    <div class="cmax" title="the break-even ceiling from our value model - past this you provably overpaid.">worth <b>$${a.max}</b>${a.max !== a.worth ? ` <span>(value $${a.worth}, plan-capped)</span>` : ""}</div>
+    ${a.est ? `<div class="cest">room bids <b>~$${a.est}</b></div>` : ""}
+    ${slotRows}
+    <ul>${a.reasons.slice(0, 5).map((r) => `<li>${r}</li>`).join("")}</ul>
+    ${tagChips}`;
+}
+
+/* ---------------- AI live read (self-host only, gated) ----------------
+ * The hosted app ships with config.AI_ENDPOINT null, so cp stays null and none
+ * of this runs, no #liveread renders, no network call is made. A self-hoster
+ * running copilot-server/ sets the endpoint; then the browser posts the same
+ * numbers The Call already computed plus a plain-text brief. The read is
+ * advisory text beside the numbers and never enters the value math (R1, #5). */
+function copilotBrief() {
+  const os = oStates();
+  const inf = inflation();
+  const ps = planState();
+  const lines = [];
+  lines.push(`${doc.league.teams}-team, $${doc.league.budget} budget. `
+    + `${curSales.length} of ${doc.league.teams * rosterSpots(doc.league.full_roster)} sold. `
+    + `inflation x${inf.ratio.toFixed(2)} ($${inf.money} chasing $${Math.round(inf.value)}).`);
+  lines.push("owners (money / max bid / open): " + os.map((o) =>
+    `${o.is_me ? "ME>" : o.name} $${o.left}/$${Math.max(o.max, 0)}/${o.open}`).join("; "));
+  const recent = curSales.slice(-6).map((s) =>
+    `${s.name} $${s.price} ${short(owners()[s.owner])}`);
+  if (recent.length) lines.push("recent sales: " + recent.join(", ") + ".");
+  lines.push(`my plan: spent $${ps.spent}, $${ps.left} left, reserve $${ps.purseLeft}/$${ps.purseTarget}, `
+    + `open starters ${ps.openStarters.map((s) => s.lab).join(" ") || "none"}.`);
+  return lines.join("\n");
+}
+
+function rosterFitLine(p) {
+  const ps = planState();
+  const fit = planFit(p, ps);
+  if (!fit) return "";
+  if (fit.bench) {
+    return `MY ROSTER FIT: bench only for ${p.name} (${p.pos}); `
+      + `no open starter slot; bench money ~$${ps.benchPer}.`;
+  }
+  return `MY ROSTER FIT: ${p.name} (${p.pos}) fits an open starter slot; `
+    + `plan allows up to $${Math.round(fit.max)}.`;
+}
+
+function stageCopilot(p) {
+  if (!cp) return;
+  const a = advise(p);
+  cp.stage({
+    player: { name: p.name, pos: p.pos, our_value: a.worth,
+      proj_pts: p.pts, est_bid: a.est },
+    call: { verdict: a.label, worth: a.worth, plan_cap: a.planCap,
+      room_bids: a.est, reasons: a.reasons.slice(0, 5),
+      slots: a.elig.map((s) => ({ slot: s.lab,
+        plan: Math.round(s.eff ?? s.planned) })),
+      bench_per: a.benchPer, bench_open: a.benchOpen, tags: a.tags },
+    brief: copilotBrief(),
+    roster_fit: rosterFitLine(p),
+  });
 }
 
 function selectOwner(oid) {
-  selOwner = oid;
+  selOwner = oid; ownerFilter = "";
   renderOwnerGrid(); updateSummary();
   $("#sold").focus();
 }
@@ -1024,19 +1370,31 @@ function updateSummary() {
   if (picked && selOwner != null) {
     const o = owners()[selOwner];
     const pr = parseInt($("#price").value, 10);
+    let warn = "";
+    if (o.is_me) {
+      const ps = planState();
+      const fit = planFit(picked, ps);
+      if (fit && fit.bench && !["K", "DEF"].includes(picked.pos)
+        && ps.openStarters.length) {
+        warn = `<br><span style="color:var(--warn);font-weight:700">! bench buy while starters open: ${ps.openStarters.map((s) => s.lab).join(" ")}</span>`;
+      } else if (fit && !fit.bench && pr > fit.max) {
+        warn = `<br><span style="color:var(--warn);font-weight:700">! $${pr} exceeds plan fit of ${fmt$(fit.max)}</span>`;
+      }
+    }
     $("#summary").style.display = "block";
-    $("#summary").innerHTML = `<b>${picked.name}</b> to <b>${o.name}</b> for <span class="g">${pr >= 1 ? fmt$(pr) : "$?"}</span>`;
+    $("#summary").innerHTML = `<b>${picked.name}</b> to <b>${o.name}</b> for <span class="g">${pr >= 1 ? fmt$(pr) : "$?"}</span>${warn}`;
   } else {
     $("#summary").style.display = "none";
   }
 }
 
 function resetSale() {
-  picked = null; selOwner = null; hitList = []; hitSel = 0;
+  picked = null; selOwner = null; hitList = []; hitSel = 0; ownerFilter = "";
   stagedId = null;
+  if (cp) cp.clear();
   document.querySelectorAll(".row.staged").forEach((r) =>
     r.classList.remove("staged"));
-  const ids = ["#picked", "#saleform", "#call", "#summary"];
+  const ids = ["#picked", "#call", "#summary"];
   ids.forEach((i) => { const n = $(i); if (n) n.style.display = "none"; });
   if ($("#hits")) $("#hits").innerHTML = "";
   if ($("#q")) { $("#q").value = ""; $("#q").focus(); }
@@ -1060,35 +1418,83 @@ async function commit() {
   $("#q").focus();
 }
 
-async function undoLast() {
+/* Reopen the last sale for edits (button, and double-tap Escape while idle).
+ * Pops the most recent sale and re-nominates that player with the old price and
+ * owner pre-filled, so a wrong price or owner is a quick fix. Replaces the old
+ * UNDO LAST: a mis-entry now reopens instead of just vanishing. */
+async function reopenLastSale() {
   const last = curSales[curSales.length - 1];
   if (!last) return;
+  const pid = last.pid, oldPrice = last.price, oldOwner = last.owner;
   appendUnsale(doc, last.seq);
   await saveDoc(doc);
-  stampShow("UNDONE", `${last.name} back on the board`);
   refreshRoom();
+  if (!byId[pid]) return;
+  pick(pid);
+  $("#price").value = oldPrice;
+  selectOwner(oldOwner);
+  $("#price").focus(); $("#price").select();
+  stampShow("REOPENED", `${byId[pid].name} back for edits`);
 }
 
 /* ---------------- modal (ported, minus profile layer for now) ------- */
 
 function openModal(pid) {
   const p = byId[pid], sale = soldBy[pid];
-  const rows = [
-    ["tier", p.tier != null ? p.tier : "-"],
-    ["our value", p.usd != null ? fmt$(p.usd) : "$1", "g"],
-    ["status", (p.inj || "healthy") + (p.rookie ? " / rookie" : "")],
-  ];
-  const d = dealOf(p);
-  if (d != null) rows.push(["deal", (d > 0 ? "+" : "") + Math.round(d)]);
+  const tg = tagsOf(pid);
+  /* research popup: only what the board does NOT already show survives here */
+  const rows = [["tier", p.tier != null ? p.tier : "-"]];
+  if (!sale && p.usd != null) rows.push(["our$", fmt$(Math.round(p.usd))]);
+  if (p.y_avg != null) {
+    rows.push(["avg auction", fmt$(Math.round(p.y_avg))]);
+    rows.push(["est. league bid",
+      `${fmt$(Math.round(p.y_avg * mScale))} (x${mScale.toFixed(2)})`]);
+    const dl = dealOf(p);
+    if (dl != null) {
+      const r = Math.round(dl);
+      rows.push(["deal", (r >= 0 ? "+" : "-") + "$" + Math.abs(r),
+        r >= 0 ? "pos" : "neg"]);
+    }
+  }
+  rows.push(["status", (p.inj || "healthy") + (p.rookie ? " / rookie" : "")]);
   if (sale) {
     rows.unshift(["SOLD",
       fmt$(sale.price) + " to " + owners()[sale.owner].name, "g"]);
+    if (p.usd != null) {
+      const v = Math.round(p.usd), diff = sale.price - v;
+      rows.splice(1, 0, ["our$", fmt$(v)
+        + (diff > 0 ? ` (paid +$${diff} over)` : diff < 0 ? ` (-$${-diff} under)` : ""),
+        sale.price <= v ? "g" : ""]);
+    }
   }
+  const profile = tg && (tg.note || tg.opinion || (tg.tags || []).length)
+    ? `<div id="mprofile">${tg.note ? `<b>NEWS &amp; NOISE</b>${tg.note}` : ""}
+      ${tg.opinion ? `<b style="margin-top:8px">MY TAKE</b>${tg.opinion}` : ""}
+      ${(tg.tags || []).length ? `<div class="ptags">${tg.tags.map((t) => `<span>${t.replace(/_/g, " ")}</span>`).join("")}</div>` : ""}</div>`
+    : "";
+  /* My Calls: nudge this player's value up or down; only for skill players and
+   * only while unsold (nudging a sold player has no live effect). */
+  const cd = callOf(pid);
+  const calls = (!sale && POSITIONS.includes(p.pos))
+    ? `<div id="mcalls"><b>MY CALLS</b>
+        <div class="callstep">
+          <button class="cstep dn" data-inc="-2">-2</button>
+          <button class="cstep dn" data-inc="-1">-1</button>
+          <span class="cdelta ${cd > 0 ? "up" : cd < 0 ? "dn" : ""}">${cd > 0 ? "+" : ""}${cd}</span>
+          <button class="cstep up" data-inc="1">+1</button>
+          <button class="cstep up" data-inc="2">+2</button>
+        </div>
+        <div class="chint">nudges your value on the board (in the "blend + My Calls" run); does not touch the base blend</div></div>`
+    : "";
   $("#modal").innerHTML = `<h3>${p.name}</h3><div class="sub">${p.pos} &middot; ${p.team || ""}</div>
     <table id="mtable">${rows.map((r) => `<tr><td>${r[0]}</td><td class="${r[2] || ""}">${r[1]}</td></tr>`).join("")}</table>
+    ${profile}
+    ${calls}
     ${!sale ? `<button id="msell">RECORD SALE</button>`
     : `<button id="mrev">REVERSE THIS SALE</button>`}`;
   $("#ovl").style.display = "flex";
+  document.querySelectorAll("#mcalls .cstep").forEach((b) =>
+    b.onclick = () => applyCall(pid, +b.dataset.inc));
   const ms = $("#msell");
   if (ms) ms.onclick = () => { closeModal(); pick(p.id); };
   const mr = $("#mrev");
@@ -1102,9 +1508,90 @@ function openModal(pid) {
     };
   }
 }
+
+/* apply a My Calls nudge (in dollars) and refresh the board + popup live */
+async function applyCall(pid, inc) {
+  doc.calls = doc.calls || [];
+  let c = doc.calls.find((x) => x.pid === pid);
+  if (!c) { c = { pid, delta: 0 }; doc.calls.push(c); }
+  c.delta += inc;
+  if (c.delta === 0) doc.calls = doc.calls.filter((x) => x !== c);
+  if (doc.calls.length) doc.ui.run = "calls";
+  else if (doc.ui.run === "calls") doc.ui.run = null;
+  await saveDoc(doc);
+  refreshRoom();      // rebuild the board on the blend + My Calls run
+  openModal(pid);     // re-render the popup with the new delta and value
+}
 function closeModal() {
   $("#ovl").style.display = "none";
   if (!picked && $("#q")) $("#q").focus();
+}
+
+/* ---------------- plan editor (edit envelopes / variants) ---------------- */
+
+function openPlanEditor() {
+  if (!doc.league || !doc.league.plan) {
+    alert("Fetch or import projections first; the plan needs a valued board.");
+    return;
+  }
+  const plan = doc.league.plan;
+  plan.variants = plan.variants || {};
+  /* only the skill-starter envelopes are editable; K/DEF/BN are the purse */
+  const keys = Object.keys(plan.envelopes)
+    .filter((k) => !["K", "DEF", "BN"].includes(k));
+  const rows = keys.map((k) =>
+    `<tr><td>${k}</td><td><input class="penv" data-k="${k}" type="number" min="1" step="1" value="${plan.envelopes[k]}" style="width:80px;text-align:right"></td></tr>`)
+    .join("");
+  const purseVal = plan.purse != null ? plan.purse
+    : Math.round((plan.float_target[0] + plan.float_target[1]) / 2) + 6;
+  const varOpts = Object.keys(plan.variants).map((v) =>
+    `<option value="${v}">${v}</option>`).join("");
+  $("#modal").innerHTML = `<h3>Budget plan</h3>
+    <div class="sub">stars-and-scrubs envelopes: what you plan to spend per starting slot. These shape The Call's plan-fit and your roster projections; they never touch the value math. The live water-fill flexes them as the draft unfolds.</div>
+    ${varOpts ? `<div class="field"><span>Load a saved variant</span><select id="pvar"><option value="">(pick one)</option>${varOpts}</select></div>` : ""}
+    <div class="field"><span>Reserve held for bench + K + DEF</span><input id="ppurse" type="number" min="0" step="1" value="${purseVal}" style="width:80px;text-align:right"></div>
+    <table id="mtable">${rows}</table>
+    <div class="wiznav" style="margin-top:14px;gap:8px;flex-wrap:wrap">
+      <button class="ghost tiny" id="planDefault">reset to value default</button>
+      <button class="ghost tiny" id="planSaveAs">save as variant...</button>
+      <button class="primary" id="planSave">Save plan</button>
+    </div>`;
+  $("#ovl").style.display = "flex";
+  const readInputs = () => {
+    document.querySelectorAll(".penv").forEach((inp) => {
+      plan.envelopes[inp.dataset.k] = Math.max(1, parseInt(inp.value, 10) || 1);
+    });
+    const pv = parseInt($("#ppurse").value, 10);
+    plan.purse = Number.isFinite(pv) ? pv : null;
+  };
+  $("#planSave").onclick = async () => {
+    readInputs(); await saveDoc(doc); closeModal(); refreshRoom();
+  };
+  $("#planDefault").onclick = async () => {
+    doc.league.plan = { ...defaultPlan(curRun.players, slotOrder(),
+      doc.league.budget), variants: plan.variants };
+    await saveDoc(doc); closeModal(); openPlanEditor();
+  };
+  $("#planSaveAs").onclick = async () => {
+    const name = (prompt("Name this plan variant:") || "").trim();
+    if (!name) return;
+    readInputs();
+    plan.variants[name] = { envelopes: { ...plan.envelopes },
+      purse: plan.purse, float_target: [...plan.float_target] };
+    await saveDoc(doc); openPlanEditor();
+  };
+  const pvar = $("#pvar");
+  if (pvar) {
+    pvar.onchange = async () => {
+      const v = plan.variants[pvar.value];
+      if (!v) return;
+      plan.envelopes = { ...v.envelopes };
+      plan.purse = v.purse;
+      plan.float_target = [...v.float_target];
+      plan.variant = pvar.value;
+      await saveDoc(doc); openPlanEditor();
+    };
+  }
 }
 
 /* ---------------- the room shell ---------------- */
@@ -1114,35 +1601,12 @@ function renderBoardScreen() {
   root.innerHTML = "";
   buildModel();
 
-  const bar = el("div", "topbar");
-  if (curRun) {
-    const runChip = el("div", "chip");
-    runChip.innerHTML = `<span class="lab">values from</span>
-      <b>${curRun.source_label === "blend" ? "blend" : curRun.as_of}</b>`;
-    runChip.title = "which saved run all board values come from. "
-      + (curRun.source_label === "blend" ? curRun.as_of : "");
-    bar.appendChild(runChip);
-    for (const id of ["infl", "soldct", "heat", "lastchip"]) {
-      const c = el("div", "chip"); c.id = id; bar.appendChild(c);
-    }
-  }
-  bar.appendChild(el("span", "spacer"));
-  const add = el("button", null, "ADD SOURCE");
-  add.onclick = () => { importState = { kind: "values" }; renderImport(); };
-  bar.appendChild(add);
-  const undo = el("button", "danger", "UNDO LAST");
-  undo.title = "remove the last recorded sale";
-  undo.onclick = undoLast;
-  bar.appendChild(undo);
-  const reset = el("button", "danger", "RESET");
-  reset.onclick = async () => {
-    if (!confirm("Delete all local Liquid Sheets data? Export a backup first."))
-      return;
-    await wipeDoc(); doc = null; resetSale();
-    wizardState.step = 0; renderWizard();
-  };
-  bar.appendChild(reset);
-  root.appendChild(bar);
+  /* chrome chips (run selector + status) live on the masthead line now */
+  const tc = $("#topchips");
+  tc.innerHTML = curRun ? `
+    <div class="chip"><span class="lab">values from</span><select id="runsel" title="which run all board values come from; add a new source at the bottom of the list"></select></div>
+    <div class="chip" id="infl"></div>
+    <div class="chip" id="lastchip"></div>` : "";
 
   if (!curRun) {
     const empty = el("div", "empty");
@@ -1161,30 +1625,38 @@ function renderBoardScreen() {
 
   const layout = el("div", "layout");
   const boardcol = el("div", "boardcol");
-  const board = el("div", "cols"); board.id = "board";
-  boardcol.appendChild(board);
+  boardcol.innerHTML = `
+    <div id="btabs">
+      <button class="btab on" data-tab="board">BOARD</button>
+      <button class="btab" data-tab="teams">TEAMS</button>
+    </div>
+    <div class="boardscroll">
+      <div class="cols" id="board"></div>
+      <div id="teams" style="display:none"></div>
+    </div>`;
   layout.appendChild(boardcol);
 
   const rail = el("div"); rail.id = "rail";
   rail.innerHTML = `
+    <div id="flow" title="room currents, recomputed after every sale: runs, hot/cold positions, crunches, hoarders, pace"></div>
     <div class="panel">
       <input id="q" placeholder="/Player" autocomplete="off">
       <div id="hits"></div>
       <div id="picked"></div>
       <div id="call"></div>
+      ${AI_ENABLED ? '<div id="liveread"></div>' : ""}
       <div id="saleform">
         <div class="steplab">price</div>
         <span style="font-family:var(--mono);color:var(--gold);font-size:17px;font-weight:700">$</span>
         <input id="price" type="number" min="1" step="1" placeholder="0">
-        <div id="ogrid"></div>
+        <div id="salegrid">
+          <div><h2><select id="rostersel" title="view any team's roster"></select></h2><div id="roster"></div></div>
+          <div><div class="steplab">owner</div><div id="ogrid"></div></div>
+        </div>
         <div id="summary"></div>
         <button id="sold" disabled>DRAFT</button>
         <div id="msg"></div>
       </div>
-    </div>
-    <div class="panel">
-      <h2><select id="rostersel" title="view any team's roster"></select></h2>
-      <div id="roster"></div>
     </div>
     <div class="panel">
       <h2 id="ledgerhead" style="cursor:pointer" title="click to collapse/expand">Owner ledger <span id="ledgerarrow">&#9662;</span></h2>
@@ -1192,9 +1664,39 @@ function renderBoardScreen() {
         <div class="ohead"><span>team</span><span>left</span><span>max bid</span><span>open</span></div>
         <div id="ownerbody"></div>
       </div>
+    </div>
+    <div class="panel">
+      <h2 id="flaggedhd" style="cursor:pointer;user-select:none" title="players flagged by imported research tags/notes. Sorted by potential impact: flag weight x player value. Never derived from price. Click to expand/collapse."><span id="flaggedcaret" style="display:inline-block;transition:transform .18s;color:var(--faint)">&rsaquo;</span> Flagged Players<span id="flaggedcount" style="color:var(--faint);font-weight:400;font-size:12px"></span></h2>
+      <div id="notes"></div>
     </div>`;
   layout.appendChild(rail);
   root.appendChild(layout);
+
+  const runsel = $("#runsel");
+  runsel.innerHTML = doc.runs.map((r) =>
+    `<option value="${r.run_id}">${r.source_label} (#${r.run_id})</option>`)
+    .join("")
+    + ((doc.calls || []).length
+      ? `<option value="calls">blend + My Calls</option>` : "")
+    + `<option disabled>--------</option><option value="__add">Add New...</option>`;
+  runsel.value = String(curRun.run_id);
+  runsel.onchange = async () => {
+    const v = runsel.value;
+    if (v === "__add") { importState = { kind: "values" }; renderImport(); return; }
+    doc.ui.run = v === "calls" ? "calls" : parseInt(v, 10);
+    await saveDoc(doc); refreshRoom();
+  };
+  document.querySelectorAll(".btab").forEach((b) => {
+    b.onclick = () => {
+      boardTab = b.dataset.tab; localStorage.setItem("ls-tab", boardTab);
+      applyTab();
+    };
+  });
+  $("#flaggedhd").onclick = () => {
+    flaggedOpen = !flaggedOpen;
+    localStorage.setItem("ls-flagged", flaggedOpen ? "open" : "closed");
+    renderNotes();
+  };
 
   $("#q").addEventListener("input", () => {
     hitList = search($("#q").value); hitSel = 0; renderHits();
@@ -1225,7 +1727,8 @@ function renderBoardScreen() {
     $("#ledgerarrow").innerHTML = open ? "&#9656;" : "&#9662;";
   };
 
-  renderBoard(); renderOwners(); renderRoster(); renderChips();
+  renderBoard(); renderTeams(); renderOwners(); renderRoster();
+  renderChips(); renderNotes(); renderFlow(); applyTab();
 }
 
 /* re-render everything after a state change, preserving staged state */
@@ -1238,7 +1741,6 @@ function refreshRoom() {
   }
 }
 
-const renderBoard_screen_alias = renderBoardScreen;
 
 /* ---------------- keys (ported) ---------------- */
 
@@ -1250,14 +1752,45 @@ document.addEventListener("keydown", (e) => {
   const a = document.activeElement;
   const inInput = a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA"
     || a.tagName === "SELECT");
+  const modalUp = $("#ovl").style.display === "flex";
   if (e.key === "/" && !inInput) { $("#q").focus(); e.preventDefault(); return; }
-  if (e.key === "Escape") { resetSale(); closeModal(); return; }
+  if (e.key === "Escape") {
+    /* idle + a recent sale exists: double-tap within 500ms reopens it for a
+     * price/owner edit. A single idle tap does nothing. */
+    if (!picked && !modalUp && curSales.length) {
+      const now = performance.now();
+      if (now - lastEsc < 500) { lastEsc = 0; reopenLastSale(); return; }
+      lastEsc = now; return;
+    }
+    resetSale(); closeModal(); return;
+  }
   if (!inInput && !picked && e.key.length === 1 && /[a-z]/i.test(e.key)
     && !e.metaKey && !e.ctrlKey && !e.altKey) { $("#q").focus(); return; }
   if (picked && !inInput && e.key in OKEYS) {
     const btns = document.querySelectorAll(".obtn");
     const b = btns[OKEYS[e.key]];
     if (b) { selectOwner(+b.dataset.oid); e.preventDefault(); return; }
+  }
+  /* type-to-filter the owner grid while staged (digit hotkeys take precedence,
+   * inert while the modal is up). Enter takes the first match. */
+  if (picked && !inInput && !modalUp) {
+    if (e.key === "Enter" && ownerFilter) {
+      const hit = owners().find((o) =>
+        o.name.toLowerCase().startsWith(ownerFilter));
+      ownerFilter = "";
+      if (hit) selectOwner(hit.id); else renderOwnerGrid();
+      e.preventDefault(); return;
+    }
+    if (e.key === "Backspace" && ownerFilter) {
+      ownerFilter = ownerFilter.slice(0, -1);
+      renderOwnerGrid(); e.preventDefault(); return;
+    }
+    if (e.key.length === 1
+      && (/[a-z'.]/i.test(e.key) || (e.key === " " && ownerFilter))
+      && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      ownerFilter += e.key.toLowerCase();
+      renderOwnerGrid(); e.preventDefault(); return;
+    }
   }
   if (picked && !inInput && e.key === "Enter" && !$("#sold").disabled
     && !(a && a.className && String(a.className).includes("obtn"))) {
@@ -1274,15 +1807,92 @@ document.addEventListener("keydown", (e) => {
 });
 $("#ovl").onclick = (e) => { if (e.target.id === "ovl") closeModal(); };
 
+/* ---------------- under the hood (rewritten for strangers) ---------------- */
+
+const HELP_VALUE = `<div style="font-size:13.5px;line-height:1.6;color:var(--muted)">
+  <p><b style="color:var(--text)">1. Bring your own projections; blend them.</b>
+  One click pulls Sleeper's public projections; you can paste or import more
+  sources (Yahoo, ESPN, FantasyPros, a rankings list). When you have more than
+  one, the board averages them, because ensembles beat any single forecaster.</p>
+  <p><b style="color:var(--text)">2. Re-scored under YOUR rules.</b>
+  Points are recomputed from raw stats with the exact scoring you entered in the
+  wizard. That is why these values can differ from any public sheet.</p>
+  <p><b style="color:var(--text)">3. Availability discount.</b>
+  Each projection is trimmed by the games players at that draft slot
+  historically miss (a shipped, attributed aggregate of open data). Elite RB
+  slots miss the most; the discount is baked in.</p>
+  <p><b style="color:var(--text)">4. Points above a free player.</b>
+  When the draft ends, a replacement-level player at each position is still free
+  on waivers. So points a free player would also score are worth $0; a player's
+  worth is only his points ABOVE that line. Tiers mark real value cliffs (a tier
+  ends once value falls 20% below that tier's own top).</p>
+  <p><b style="color:var(--text)">Then points become dollars.</b>
+  The room holds teams x budget. After $1 minimums for every roster spot, the
+  rest splits among players in proportion to surplus. Every value sums back to
+  the room's money, so if one player is overpriced another is underpriced.</p>
+  <p><b style="color:var(--text)">What sits on top (evidence, never inside the
+  number).</b> DEAL compares our value to a market source you pasted, rescaled
+  to your league's money supply. My Calls (your convictions, clamped +/-15%)
+  live only in the separate "blend + My Calls" run you pick in the values-from
+  dropdown. Flags and notes are whatever you import; the app ships none.</p>
+  </div>`;
+
+const HELP_ROOM = `<div style="font-size:13.5px;line-height:1.6;color:var(--muted)">
+  <p><b style="color:var(--text)">One place, one verdict.</b>
+  Stage a player (double-click a row, or search and Enter) and The Call fires
+  instantly: a verdict pill, the bid ceiling, the envelope status of the slots
+  he could fill, and the comparable-supply line. It is pure arithmetic over the
+  numbers already on screen, so it works offline.</p>
+  <p><b style="color:var(--text)">The pressure strip.</b>
+  The top-bar strip is deterministic and recomputed after every sale: per
+  position, starter slots still needed league-wide vs startable players left.
+  Amber = window closing, red = crunch. A pulsing marker flags a positional run;
+  hoarder and pace chips appear only when they fire.</p>
+  <p><b style="color:var(--text)">Your plan.</b>
+  The envelopes you set under PLAN water-fill to your remaining budget as the
+  draft unfolds: envelopes grow when you bank deals and shrink when you overpay,
+  each capped at the best value still available for that slot. A reserve is held
+  back for your bench, K and DEF so a starter run never strands them.</p>
+  <p><b style="color:var(--text)">The AI live read (self-host only).</b>
+  This hosted app ships with no AI: no key, no calls, nothing leaves your
+  browser but the projection sources you fetch yourself. Developers who want a
+  live "reading the room" can run the small companion server in the open-source
+  repo (copilot-server/) against their own AI, and point the app's config at it.
+  It is a layer, never a dependency: the board and The Call never need it.</p>
+  </div>`;
+
+function openHelp() {
+  $("#modal").innerHTML = `<h3>Under the hood</h3>
+    <div class="sub">every number traces to one saved run (see the values-from chip)</div>
+    <div id="mtabs">
+      <button class="mtab on" data-m="v">our$</button>
+      <button class="mtab" data-m="r">the room</button>
+    </div>
+    <div id="mtabc">${HELP_VALUE}</div>`;
+  document.querySelectorAll(".mtab").forEach((b) => {
+    b.onclick = () => {
+      document.querySelectorAll(".mtab").forEach((x) =>
+        x.classList.toggle("on", x === b));
+      $("#mtabc").innerHTML = b.dataset.m === "v" ? HELP_VALUE : HELP_ROOM;
+    };
+  });
+  $("#ovl").style.display = "flex";
+}
+
 /* ---------------- boot ---------------- */
 
 async function boot() {
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
   doc = await loadDoc();
+  applyTheme();
   const importInput = $("#importfile");
   importInput.onchange = async () => {
     if (!importInput.files.length) return;
     try {
       doc = await importDocFile(importInput.files[0]);
+      applyTheme();
       doc.league ? renderBoardScreen() : renderWizard();
     } catch (e) { alert(e.message); }
   };
@@ -1294,6 +1904,44 @@ async function boot() {
   document.addEventListener("click", (ev) => {
     if (!menu.hidden && !menu.contains(ev.target)) menu.hidden = true;
   });
+  const themeBtn = $("#menuTheme");
+  themeBtn.classList.toggle("on", (doc?.ui?.theme || "dark") !== "light");
+  themeBtn.onclick = async () => {
+    if (!doc) return;
+    doc.ui.theme = doc.ui.theme === "light" ? "dark" : "light";
+    doc.ui.themeChosen = true;
+    applyTheme(); await saveDoc(doc);
+    themeBtn.classList.toggle("on", doc.ui.theme !== "light");
+    if (doc.league && curRun) refreshRoom();
+  };
+  $("#menuPlan").onclick = () => {
+    menu.hidden = true;
+    if (!doc || !doc.league) { alert("Finish setup first."); return; }
+    openPlanEditor();
+  };
+  let resetArmed = 0;
+  const resetBtn = $("#menuReset");
+  resetBtn.onclick = async (ev) => {
+    ev.stopPropagation();
+    if (!doc || !doc.league) { alert("Nothing to reset yet."); return; }
+    if (Date.now() - resetArmed > 5000) {
+      resetArmed = Date.now();
+      resetBtn.textContent = "Click again to CONFIRM reset";
+      setTimeout(() => {
+        resetBtn.textContent = "Reset board (clear all sales)"; resetArmed = 0;
+      }, 5000);
+      return;
+    }
+    resetBtn.textContent = "Reset board (clear all sales)";
+    resetArmed = 0; menu.hidden = true;
+    const n = activeSales(doc.journal).length;
+    doc.journal = [];                 // deliberate draft reset; league is kept
+    await saveDoc(doc);
+    resetSale();
+    stampShow("RESET", `${n} sales cleared`);
+    refreshRoom();
+  };
+  $("#menuHelp").onclick = () => { menu.hidden = true; openHelp(); };
   $("#menuImport").onclick = () => { menu.hidden = true; importInput.click(); };
   $("#menuExport").onclick = () => {
     menu.hidden = true;
@@ -1306,6 +1954,30 @@ async function boot() {
     try { await doFetchSleeper(); renderBoardScreen(); }
     catch (e) { alert(`Fetch failed (${e.message}). Are you offline?`); }
   };
+  $("#ovl").onclick = (e) => { if (e.target.id === "ovl") closeModal(); };
+
+  /* AI live read: wired ONLY when a self-hoster set config.AI_ENDPOINT. The
+   * hosted build has AI_ENABLED false, so nothing here runs and no AI UI or
+   * network call exists. */
+  if (AI_ENABLED) {
+    try {
+      const mod = await import("./copilot.js");
+      cp = mod.makeCopilot(AI_ENDPOINT);
+      const btn = document.createElement("button");
+      btn.id = "menuCopilot"; btn.className = "";
+      const setLabel = () => { btn.textContent = "AI live read: " + cp.mode(); };
+      setLabel();
+      btn.onclick = () => {
+        const modes = ["synthesize", "complement", "off"];
+        const next = modes[(modes.indexOf(cp.mode()) + 1) % modes.length];
+        cp.setMode(next); setLabel();
+        if (next === "off") cp.clear();
+        else if (picked) stageCopilot(picked);
+      };
+      menu.insertBefore(btn, $("#menuHelp"));
+    } catch (e) { console.warn("copilot unavailable", e); }
+  }
+
   if (doc && doc.league) renderBoardScreen();
   else renderWizard();
 }

@@ -1,34 +1,69 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Liquid Sheets</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#128167;</text></svg>">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#5b4397">
 <style>
-/* Tokens ported from the original (levi-sheet/draftroom/app.html, V36):
- * paper-ledger light set, split DATA vs CHROME. Theme blocks land in M4. */
+/* Tokens ported from the original (levi-sheet/draftroom/app.html, V56):
+ * paper-ledger light set, split DATA vs CHROME, plus the dark theme. Light is
+ * the default (no data-theme attr); dark is an explicit choice set by the gear
+ * toggle via document.documentElement.dataset.theme (V55 retired focus/inverted). */
 :root{
-  --ground:#f6f3ec; --zebra:#efece2; --surface:#fbf9f4; --raised:#eae6da;
-  --input:#fdfcf8;
-  --sel:#dde7f2; --focus:#2f5f9e;
-  --line:#d9d4c6; --line-soft:#e3dfd3;
-  --text:#2a2733; --muted:#5c5850; --faint:#8a857b;
-  --purple:#5b4397; --purple-soft:#dde7f2;
-  --gold:#7a5410; --gold-hi:#5e400a; --gold-dim:#c9b57e;
-  --good:#0d6b46; --bad:#a63a30; --warn:#a96a12;
-  --c-bg:#e6e0d0; --c-panel:#ded7c5; --c-line:#c6bea9;
-  --c-text:#2a2733; --c-muted:#655e50; --c-chip:#efeadd;
-  --c-gold:#7a5410; --c-brand:#5b4397;
-  --picked-bg:#f3ead3; --mine-bg:#f0e7cd; --mine-odd:#ece2c4;
-  --stamp-bg:rgba(253,251,244,.96);
+  /* data area: neutral light greys with crisp white panels (no warm tones) */
+  --ground:#eef0f2; --zebra:#e6e9ec; --surface:#ffffff; --raised:#e3e6ea;
+  --input:#ffffff;
+  --sel:#dde8f2; --focus:#2f6f9e;
+  --line:#d5d9de; --line-soft:#e4e7ea;
+  --text:#22262c; --muted:#585f68; --faint:#8a919b;
+  --purple:#3f6f92; --purple-soft:#dde8f2;
+  --gold:#2f7a90; --gold-hi:#1f5f72; --gold-dim:#a7c2cc;
+  --good:#1a7a4f; --bad:#b0473a; --warn:#9a6a1a;
+  /* chrome (top bar + sidebar): a cooler, darker neutral grey so it separates
+     from the near-white data board */
+  --c-bg:#dfe3e8; --c-panel:#d7dbe1; --c-line:#c1c7cf;
+  --c-text:#22262c; --c-muted:#575e68; --c-chip:#e9edf1;
+  --c-gold:#2f7a90; --c-brand:#3f6f92;
+  --picked-bg:#e4eef4; --mine-bg:#e0eaf0; --mine-odd:#dae6ec;
+  --stamp-bg:rgba(255,255,255,.96);
   --pos-qb:#1f6db3; --pos-rb:#118a67; --pos-wr:#c05e14;
-  --pos-te:#c23e7b; --pos-k:#79842a; --pos-def:#a67d1c;
+  --pos-te:#c23e7b; --pos-k:#79842a; --pos-def:#a67d1c; --pos-flx:#7b3fd4;
   --posbg-qb:#e3eefb; --posbg-rb:#e0f2ec; --posbg-wr:#f9e9dc;
   --posbg-te:#f9e3ef; --posbg-k:#eef0d8; --posbg-def:#f7ecd2;
   --disp:"Copperplate","Copperplate Gothic Bold",Georgia,serif;
   --ui:Verdana,Geneva,"DejaVu Sans",sans-serif;
   --mono:Menlo,"SF Mono",Consolas,monospace;
+}
+/* DARK theme: neutral slate data board with a cool graphite chrome and
+ * steel-cyan accents (team-neutral; the chrome is separated from the data
+ * board by a cool hue, not by purple). */
+:root[data-theme="dark"]{
+  --ground:#1e2027; --zebra:#24262e; --surface:#272a33; --raised:#2f323c;
+  --input:#17191f;
+  --sel:#26333f; --focus:#7fb4d6;
+  --line:#3b3f49; --line-soft:#31343d;
+  --text:#d6d2c9; --muted:#98948b; --faint:#6f6b63;
+  --purple:#8fb6cf; --purple-soft:#22313d;
+  --gold:#63b2c6; --gold-hi:#82c8da; --gold-dim:#3a6470;
+  --good:#66bd8f; --bad:#e08563; --warn:#d6b45a;
+  --c-bg:#12171e; --c-panel:#0c1015; --c-line:#28323d;
+  --c-text:#d4d9df; --c-muted:#8b939d; --c-chip:#19212a;
+  --c-gold:#63b2c6; --c-brand:#a7c3d6;
+  --picked-bg:#1c2833; --mine-bg:#202c37; --mine-odd:#1b2731;
+  --stamp-bg:rgba(18,20,24,.95);
+  --pos-qb:#4aa2e8; --pos-rb:#35c095; --pos-wr:#f08a3e;
+  --pos-te:#f06ea9; --pos-k:#b5c445; --pos-def:#e0b246; --pos-flx:#a982f5;
+  --posbg-qb:#14213f; --posbg-rb:#0f2e28; --posbg-wr:#3a1c10;
+  --posbg-te:#3a1230; --posbg-k:#2b2e12; --posbg-def:#33290f;
+}
+/* dark-theme sidebar: cool steel-slate panels so the rail never reads as the
+ * same material as the neutral board (re-scopes tokens under #rail). */
+:root[data-theme="dark"] #rail{
+  --surface:#1a232d; --zebra:#1f2833; --raised:#26313d;
+  --line:#2f3b47; --line-soft:#28323d; --input:#12181f;
 }
 *{box-sizing:border-box;margin:0}
 html,body{height:100%}
@@ -62,6 +97,16 @@ header .ver{color:var(--c-muted);font-size:10px;font-family:var(--mono)}
 .gearmenu button{border:none;background:none;border-radius:4px;
   text-align:left;padding:8px 10px;font-size:13px;color:var(--c-text)}
 .gearmenu button:hover{background:var(--c-bg)}
+.gtoggle{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.gtoggle .sw{position:relative;width:34px;height:18px;border-radius:9px;
+  background:var(--c-line);transition:background .15s;flex:none}
+.gtoggle .sw .knob{position:absolute;top:2px;left:2px;width:14px;height:14px;
+  border-radius:50%;background:var(--c-chip);transition:left .15s;
+  box-shadow:0 1px 2px rgba(0,0,0,.4)}
+.gtoggle.on .sw{background:var(--c-gold)}
+.gtoggle.on .sw .knob{left:18px}
+.gearmenu button.gdanger{color:var(--bad);font-weight:700}
+.gearmenu button.gdanger:hover{background:var(--c-bg)}
 
 /* ---------- topbar chips row ---------- */
 .topbar{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap;
@@ -98,8 +143,10 @@ header .ver{color:var(--c-muted);font-size:10px;font-family:var(--mono)}
  * scrolls, the board and rail scroll inside their own columns ---------- */
 #main{display:flex;flex-direction:column;height:calc(100% - 56px);
   overflow-y:auto}
-.layout{flex:1;min-height:0;display:grid;grid-template-columns:1fr 336px}
-.boardcol{min-width:0;overflow-y:auto;border-right:2px solid var(--line)}
+.layout{flex:1;min-height:0;display:grid;grid-template-columns:1fr 312px}
+.boardcol{min-width:0;display:flex;flex-direction:column;overflow:hidden;
+  border-right:2px solid var(--line)}
+.boardscroll{flex:1;min-height:0;overflow-y:auto}
 .cols{display:grid;grid-template-columns:1fr 1.05fr 1.05fr 1fr .8fr;gap:1px;
   background:var(--line-soft)}
 .poscol{background:var(--ground);min-width:0}
@@ -111,7 +158,8 @@ header .ver{color:var(--c-muted);font-size:10px;font-family:var(--mono)}
   color:var(--faint);cursor:help}
 .colhead .t2{display:grid;gap:6px;padding:5px 0 4px;font-size:9px;
   letter-spacing:.14em;color:var(--faint);text-transform:uppercase}
-.colhead .t2 span:last-child,.colhead .t2 span.r{text-align:right}
+.colhead .t2 span:last-child,.colhead .t2 span.r,
+.colhead .t2 .edge,.colhead .t2 .pts{text-align:right}
 .sortable{cursor:pointer}
 .sortable.on{color:var(--text);text-decoration:underline}
 .sortable:hover{color:var(--text)}
@@ -164,6 +212,7 @@ header .ver{color:var(--c-muted);font-size:10px;font-family:var(--mono)}
 .pTE{color:var(--pos-te) !important}
 .pK{color:var(--pos-k) !important}
 .pDEF{color:var(--pos-def) !important}
+.pFLX{color:var(--pos-flx) !important}
 
 /* staged pulse (ported) */
 .row.staged{border-left-color:var(--gold);
@@ -208,17 +257,21 @@ header .ver{color:var(--c-muted);font-size:10px;font-family:var(--mono)}
 .cmax span{color:var(--faint);font-size:12px;font-family:var(--mono)}
 #call ul{margin:7px 0 0;padding-left:16px}
 #call li{font-size:12.5px;color:var(--muted);margin:3px 0;line-height:1.4}
-#saleform{display:none;margin-top:10px}
+#saleform{margin-top:10px}   /* always on screen (V55): price, roster, owners, DRAFT */
+#salegrid{display:grid;grid-template-columns:1fr 25%;gap:10px;margin-top:6px;
+  align-items:start}
+#salegrid h2{margin-bottom:4px;margin-top:8px;font-size:10px;font-weight:700;
+  letter-spacing:.22em;color:var(--muted);text-transform:uppercase}
 .steplab{font-size:9px;letter-spacing:.16em;color:var(--faint);
   text-transform:uppercase;margin:8px 0 4px}
 #price{width:96px;background:var(--input);border:1px solid var(--line);
   border-radius:4px;padding:8px 10px;font-family:var(--mono);font-size:18px;
   color:var(--gold);font-weight:700;outline:none}
 #price:focus{border-color:var(--gold)}
-#ogrid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:9px}
-.obtn{display:flex;justify-content:space-between;gap:6px;padding:7px 8px;
-  border:1px solid var(--line);border-radius:3px;font-size:12px;text-align:left;
-  background:var(--ground)}
+#ogrid{display:grid;grid-template-columns:1fr;gap:2px;margin-top:2px}
+.obtn{display:block;width:100%;padding:4px 5px;overflow:hidden;white-space:nowrap;
+  text-overflow:ellipsis;border:1px solid var(--line);border-radius:3px;
+  font-size:11.5px;text-align:left;background:var(--ground)}
 .obtn small{font-family:var(--mono);color:var(--faint)}
 .obtn:hover,.obtn:focus{border-color:var(--focus);outline:none;background:var(--sel)}
 .obtn.me{border-color:var(--gold-dim)}
@@ -372,6 +425,193 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
   color:var(--text)}
 .empty{text-align:center;margin-top:10vh;color:var(--muted)}
 .empty button{margin-top:14px}
+/* ---------- run selector chip ---------- */
+#runsel{background:var(--c-chip);color:var(--c-text);border:none;outline:none;
+  font-family:var(--mono);font-size:13px;font-weight:700;cursor:pointer;
+  padding:0;margin-top:1px;max-width:160px}
+
+/* ---------- board tabs ---------- */
+#btabs{display:flex;gap:2px;background:var(--c-bg);padding:6px 10px 0;
+  border-bottom:1px solid var(--c-line);flex:none}
+.btab{font-size:11px;font-weight:700;letter-spacing:.16em;color:var(--c-muted);
+  padding:6px 16px;border-radius:4px 4px 0 0}
+.btab.on{color:var(--text);background:var(--ground);
+  box-shadow:0 -2px 0 var(--gold) inset}
+.btab:hover{color:var(--c-text)}
+
+/* ---------- teams grid ---------- */
+#teams{background:var(--ground);padding:10px;overflow-x:auto}
+#tgrid{display:flex;gap:8px;min-width:max-content}
+.tcol{width:148px;flex:0 0 148px}
+.tcol .thead{padding:5px 6px;margin-bottom:6px;
+  border-bottom:2px solid var(--line);font-size:12px;font-weight:700;
+  color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tcol .thead small{display:block;font-family:var(--mono);font-size:11px;
+  font-weight:400;color:var(--muted)}
+.tcol.meCol .thead{border-bottom-color:var(--gold);color:var(--gold-hi)}
+.ttile{border-radius:4px;padding:6px 7px;margin-bottom:6px;cursor:pointer}
+.ttile .tn{font-size:11.5px;font-weight:700;letter-spacing:.02em;
+  text-transform:uppercase;line-height:1.25;margin-bottom:6px}
+.ttile .tmeta{display:flex;justify-content:space-between;font-size:11px;
+  color:var(--muted)}
+.ttile .tmeta b{font-family:var(--mono);color:var(--text)}
+.posbg-QB{background:var(--posbg-qb)} .posbg-RB{background:var(--posbg-rb)}
+.posbg-WR{background:var(--posbg-wr)} .posbg-TE{background:var(--posbg-te)}
+.posbg-K{background:var(--posbg-k)} .posbg-DEF{background:var(--posbg-def)}
+
+/* ---------- collapsed column strip ---------- */
+.poscol.min{cursor:pointer;background:var(--surface);display:flex;
+  justify-content:center;padding-top:10px}
+.poscol.min:hover{background:var(--raised)}
+.poscol.min .minlab{writing-mode:vertical-rl;font-size:12px;font-weight:700;
+  letter-spacing:.14em;white-space:nowrap;user-select:none;color:var(--muted)}
+.poscol.min .minlab small{font-weight:400;font-size:10px;color:var(--faint);
+  letter-spacing:.08em}
+.colbtn{margin-left:auto;cursor:pointer;border:none;background:none;
+  color:var(--faint);font-size:14px;padding:0 3px;line-height:1}
+.colbtn:hover{color:var(--text)}
+
+/* ---------- top chips (run selector + status, on the masthead line) ------- */
+#topchips{display:flex;gap:8px;align-items:center;margin-left:auto}
+#topchips:empty{display:none}
+/* ---------- flow strip (top of the rail, above the staging card) ---------- */
+#flow{display:flex;flex-wrap:wrap;gap:5px;align-items:center;padding:2px 2px 6px}
+#flow:empty{display:none;padding:0}
+.fcell{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;
+  font-size:11px;color:var(--c-muted);border:1px solid var(--c-line);
+  border-radius:4px;padding:3px 7px;background:var(--c-chip);cursor:default}
+.fcell b{font-family:var(--mono);font-size:12px;color:var(--c-text);
+  font-weight:700}
+.fcell.tight{border-color:var(--c-gold);color:var(--c-gold)}
+.fcell.tight b{color:var(--c-gold)}
+.fcell.crunch{border-color:var(--bad);color:var(--bad)}
+.fcell.crunch b{color:var(--bad)}
+.runmark{font-style:normal;font-size:9px;color:var(--c-gold);
+  animation:runpulse 1.6s ease-in-out infinite}
+.mdot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.mdot.exposed{background:var(--bad)}
+.mdot.exploit{background:var(--good)}
+@keyframes runpulse{0%,100%{opacity:1}50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.runmark{animation:none}}
+
+/* ---------- the call: slots + tags ---------- */
+.cest{margin-top:2px;font-size:13px;color:var(--muted)}
+.cest b{font-family:var(--mono);font-size:15px;color:var(--text)}
+.cslots{margin:7px 0 3px}
+.cslots .srow{display:flex;justify-content:space-between;align-items:center;
+  font-size:13px;margin:2px 0;font-family:var(--mono)}
+.cslots .pl{font-weight:700}
+.ctags{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}
+.ctags span{font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  border:1px solid var(--line);border-radius:3px;padding:2px 6px;
+  color:var(--muted)}
+.ctags .tneg{border-color:var(--bad);color:var(--bad)}
+.ctags .tpos{border-color:var(--good);color:var(--good)}
+
+/* ---------- roster plan projections ---------- */
+#roster .slot .pl{color:var(--faint);font-weight:400;cursor:help}
+
+/* ---------- owner filter + states ---------- */
+#ofilter{justify-self:start;font-family:var(--mono);font-size:11px;
+  color:var(--gold);border:1px solid var(--gold-dim);border-radius:3px;
+  padding:1px 7px;white-space:pre}
+.obtn.dim{opacity:.35}
+.obtn.hit{outline:1px solid var(--gold)}
+
+/* ---------- flagged players ---------- */
+.note{display:flex;gap:8px;align-items:center;width:100%;padding:4px 2px;
+  font-size:13px;text-align:left;border-radius:3px;position:relative}
+.note:hover{background:var(--sel)}
+.note[data-tip]:hover::after{content:attr(data-tip);position:absolute;
+  left:22px;bottom:calc(100% - 2px);z-index:5;white-space:nowrap;
+  background:var(--raised);border:1px solid var(--line);border-radius:3px;
+  padding:3px 8px;font-size:11px;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--muted);pointer-events:none}
+.note .flag{width:22px;text-align:center;font-family:var(--mono);font-size:12px;
+  font-weight:700;border-radius:3px;padding:1px 0}
+.note .flag.up{color:var(--good)}
+.note .flag.dn{color:var(--bad)}
+.note .flag.mix{color:var(--warn)}
+.note .n{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.note .n .tm{color:var(--faint);font-size:11px;margin-left:4px}
+.note .d{font-family:var(--mono);font-size:12px;color:var(--gold);
+  font-weight:700}
+.note:nth-child(odd){background:var(--zebra)}
+
+/* ---------- modal profile + tabs ---------- */
+#mtable .pos{color:var(--good);font-weight:700}
+#mtable .neg{color:var(--bad);font-weight:700}
+#mtable tr.hdr td{color:var(--faint);font-size:10px;letter-spacing:.1em;
+  text-transform:uppercase}
+#mprofile{margin-top:12px;padding:10px 12px;border-left:3px solid var(--line);
+  background:var(--surface);font-size:13.5px;line-height:1.55;color:var(--muted)}
+#mprofile b{color:var(--muted);font-size:10px;letter-spacing:.2em;display:block;
+  margin-bottom:4px}
+.ptags{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.ptags span{font-size:10px;letter-spacing:.06em;text-transform:uppercase;
+  border:1px solid var(--line);border-radius:3px;padding:2px 6px;
+  color:var(--muted)}
+#mtabs{display:flex;gap:6px;margin:2px 0 12px}
+.mtab{font-size:11px;font-weight:700;letter-spacing:.14em;color:var(--faint);
+  padding:5px 12px;border:1px solid var(--line);border-radius:4px;
+  text-transform:uppercase}
+.mtab.on{color:var(--text);border-color:var(--gold-dim);
+  background:var(--picked-bg)}
+
+/* ---------- gear divider + live read ---------- */
+.gdiv{height:1px;background:var(--c-line);margin:6px 4px}
+#liveread{margin-top:8px;padding-top:7px;border-top:1px solid var(--line-soft);
+  font-size:13px;line-height:1.5;color:var(--text);white-space:pre-wrap;
+  min-height:2.8em}
+#liveread:empty{display:none;margin:0;padding:0;border:0}
+#liveread.thinking{color:var(--faint);font-style:italic}
+
+/* ---------- My Calls editor ---------- */
+#callq{width:100%;background:var(--input);border:1px solid var(--line);
+  border-radius:4px;padding:8px 11px;font-size:14px;outline:none}
+#callq:focus{border-color:var(--focus)}
+#callhits{margin-top:2px}
+#callhits:not(:empty){margin-bottom:8px}
+#calllist{display:flex;flex-direction:column;gap:2px;max-height:44vh;
+  overflow-y:auto;margin-top:6px}
+.callrow{display:grid;grid-template-columns:1fr 82px 62px 24px;gap:8px;
+  align-items:center;padding:5px 2px;border-bottom:1px solid var(--line-soft)}
+.callrow .cn{font-size:13px;overflow:hidden;white-space:nowrap;
+  text-overflow:ellipsis}
+.callrow select,.callrow input{font:inherit;font-size:12px;padding:4px 6px;
+  border:1px solid var(--line);border-radius:4px;background:var(--input);
+  color:var(--text)}
+.callrow .cbv{text-align:right;width:100%}
+.callrow .cbd{border:1px solid var(--line);border-radius:4px;color:var(--faint);
+  background:none;font-size:12px;line-height:1;padding:4px 0}
+.callrow .cbd:hover{color:var(--bad);border-color:var(--bad)}
+
+/* ---------- modal inputs: use the app tokens, not browser defaults ---------- */
+#modal input,#modal select{background:var(--input);color:var(--text);
+  border:1px solid var(--line);border-radius:4px;padding:6px 8px;font:inherit}
+#modal input:focus,#modal select:focus{border-color:var(--focus);outline:none}
+
+/* ---------- My Calls stepper inside the player popup ---------- */
+#mcalls{margin-top:14px;padding-top:12px;border-top:1px solid var(--line-soft)}
+#mcalls b{color:var(--muted);font-size:10px;letter-spacing:.2em;display:block;
+  margin-bottom:8px}
+.callstep{display:flex;align-items:center;gap:6px}
+.callstep .cstep{width:38px;padding:7px 0;border:1px solid var(--line);
+  border-radius:5px;font-family:var(--mono);font-size:13px;font-weight:700;
+  color:var(--muted);background:var(--input)}
+.callstep .cstep.up:hover{color:var(--good);border-color:var(--good)}
+.callstep .cstep.dn:hover{color:var(--bad);border-color:var(--bad)}
+.callstep .cdelta{flex:1;text-align:center;font-family:var(--mono);
+  font-size:16px;font-weight:700;color:var(--faint)}
+.callstep .cdelta.up{color:var(--good)}
+.callstep .cdelta.dn{color:var(--bad)}
+.chint{color:var(--faint);font-size:12px;margin-top:8px;line-height:1.4}
+/* board marker for a called player */
+.row .callm{font-family:var(--mono);font-size:10px;font-weight:700;
+  margin-left:4px;padding:0 3px;border-radius:3px}
+.row .callm.up{color:var(--good);border:1px solid var(--good)}
+.row .callm.dn{color:var(--bad);border:1px solid var(--bad)}
+
 @media (max-width:1100px){.layout{grid-template-columns:1fr}
   #rail{order:-1}}
 </style>
@@ -380,15 +620,23 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
 <div id="errbar"></div>
 <header>
   <div id="mast">LIQUID SHEETS<small id="spendline">AUCTION DRAFT VALUES</small></div>
-  <span class="ver">V13 (M3.2)</span>
+  <span class="ver">V19 (parity)</span>
+  <div id="topchips"></div>
   <span class="gearwrap">
     <button id="gearbtn" aria-label="Menu">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
     </button>
     <div id="gearmenu" class="gearmenu" hidden>
+      <button id="menuTheme" class="gtoggle"><span>Dark mode</span><span class="sw"><span class="knob"></span></span></button>
+      <div class="gdiv"></div>
+      <button id="menuPlan">Budget plan</button>
+      <button id="menuHelp">Under the hood</button>
+      <div class="gdiv"></div>
       <button id="menuSleeper">Import Sleeper values</button>
       <button id="menuExport">Export backup</button>
       <button id="menuImport">Import backup</button>
+      <div class="gdiv"></div>
+      <button id="menuReset" class="gdanger">Reset board (clear all sales)</button>
     </div>
   </span>
 </header>

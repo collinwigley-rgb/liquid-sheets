@@ -1,0 +1,18 @@
+{
+  "name": "Liquid Sheets",
+  "short_name": "Liquid Sheets",
+  "description": "Auction draft values and a live draft room. Offline-first, browser-only, your data stays on your device.",
+  "start_url": "/app/",
+  "scope": "/app/",
+  "display": "standalone",
+  "background_color": "#f6f3ec",
+  "theme_color": "#5b4397",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%235b4397'/><text y='.9em' x='6' font-size='84'>&#128167;</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

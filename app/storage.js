@@ -5,7 +5,7 @@
 const DB_NAME = "liquidsheets";
 const STORE = "docs";
 const KEY = "main";
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 function openDB() {
   return new Promise((res, rej) => {
@@ -18,11 +18,31 @@ function openDB() {
 
 export async function loadDoc() {
   const db = await openDB();
-  return new Promise((res, rej) => {
+  const raw = await new Promise((res, rej) => {
     const rq = db.transaction(STORE).objectStore(STORE).get(KEY);
     rq.onsuccess = () => res(rq.result ?? null);
     rq.onerror = () => rej(rq.error);
   });
+  return raw ? migrate(raw) : null;
+}
+
+/* Forward-fill fields added in later schema versions so an older stored doc
+ * (or an imported older backup) keeps loading. Idempotent and non-destructive:
+ * only fills what is missing; never rewrites recorded runs or the journal. */
+export function migrate(doc) {
+  if (!doc.calls) doc.calls = [];        // named bets (my-calls mechanism); empty
+  if (!doc.tags) doc.tags = {};          // pid -> {tags, note, opinion}; Path E sink
+  if (!doc.ui) doc.ui = {};
+  /* dark is the default color scheme. themeChosen distinguishes a real user
+   * choice from the old hardcoded default, so pre-theme docs flip to dark while
+   * an explicit light choice persists. */
+  if (doc.ui.themeChosen === undefined) doc.ui.themeChosen = false;
+  if (!doc.ui.themeChosen) doc.ui.theme = "dark";
+  else if (!doc.ui.theme) doc.ui.theme = "dark";
+  if (!("run" in doc.ui)) doc.ui.run = null;        // selected run id
+  if (!doc.ui.planVariant) doc.ui.planVariant = "default";
+  doc.schema_version = SCHEMA_VERSION;
+  return doc;
 }
 
 export async function saveDoc(doc) {
@@ -56,7 +76,10 @@ export function newDoc() {
     sources: {},           // source name -> {as_of, players: [...]}
     runs: [],              // append-only; never mutate a recorded run
     journal: [],           // append-only sale journal (M3)
-    ui: { theme: "light" },
+    calls: [],             // named bets {name,pos,thesis,points?,adjust?}; empty
+    tags: {},              // pid -> {tags:[], note, opinion}; Path E import sink
+    ui: { theme: "dark", themeChosen: false, run: null,
+      planVariant: "default" },
   };
 }
 
@@ -78,6 +101,7 @@ export async function importDocFile(file) {
   if (doc.schema_version > SCHEMA_VERSION) {
     throw new Error("Backup is from a newer app version; refresh the app first.");
   }
+  migrate(doc);
   await saveDoc(doc);
   return doc;
 }
