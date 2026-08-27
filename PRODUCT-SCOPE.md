@@ -49,7 +49,7 @@ Buckets: **AS-IS** (port faithfully) / **GENERALIZED** (survives, reshaped for a
 | Inflation gauge, sold bar, heat, last-sale chips | AS-IS | Compact and universal |
 | Rosters dropdown (view any team) | AS-IS | No league-specific logic |
 | Print backup sheet | AS-IS | Offline-first identity; the paper fallback |
-| Themes (light/focus/dark/inverted) | AS-IS | Token architecture already clean |
+| Themes (light + dark) | AS-IS | Token architecture already clean. Amended 2026-08-27: focus and inverted were retired upstream at V55; v1.0 ships light + dark only, frozen at commit `1669bc2` (V33). See V1-SCOPE-FREEZE.md and the MASTER-PLAN learnings note |
 | Position colors | GENERALIZED | Yahoo and ESPN scheme variants, tied to a platform setting |
 | Under-the-hood explainer | GENERALIZED | Identity feature for this audience; content rewritten for strangers |
 | League setup wizard | GENERALIZED | New build; replaces hand-written league JSON. Scope: budget, team count, roster shape, scoring rules, platform |

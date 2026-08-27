@@ -4,14 +4,18 @@
  * own Sleeper/import fetches, and any self-host copilot server) goes to the
  * network and is never cached. */
 
-const CACHE = "liquid-sheets-v33";
+const CACHE = "liquid-sheets-v34";
+/* copilot.js is deliberately NOT precached: the hosted build (config.AI_ENDPOINT
+ * null) never imports it, so shipping it in the shell would cache an AI module
+ * the app never runs. A self-hoster who sets AI_ENDPOINT gets it via the runtime
+ * dynamic import() in app.js, which the network handler below serves and caches
+ * on demand. This keeps the hosted cache genuinely AI-free. */
 const SHELL = [
   "/app/",
   "/app/index.html",
   "/app/app.js",
   "/app/config.js",
   "/app/plan.js",
-  "/app/copilot.js",
   "/app/storage.js",
   "/app/importers.js",
   "/app/draft.js",
