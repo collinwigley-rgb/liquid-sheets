@@ -12,26 +12,29 @@
  * root); light is the opt-out, set by the gear toggle via
  * document.documentElement.dataset.theme. Bare :root holds the light palette. */
 :root{
-  /* data area: neutral light greys with crisp white panels (no warm tones) */
-  --ground:#eef0f2; --zebra:#e6e9ec; --surface:#ffffff; --raised:#e3e6ea;
-  --input:#ffffff;
-  --sel:#dde8f2; --focus:#2f6f9e;
-  --line:#d5d9de; --line-soft:#e4e7ea;
-  --text:#22262c; --muted:#585f68; --faint:#8a919b;
-  --purple:#3f6f92; --purple-soft:#dde8f2;
-  --gold:#2f7a90; --gold-hi:#1f5f72; --gold-dim:#a7c2cc;
-  --good:#1a7a4f; --bad:#b0473a; --warn:#9a6a1a;
-  /* chrome (top bar + sidebar): a cooler, darker neutral grey so it separates
-     from the near-white data board */
-  --c-bg:#dfe3e8; --c-panel:#d7dbe1; --c-line:#c1c7cf;
-  --c-text:#22262c; --c-muted:#575e68; --c-chip:#e9edf1;
-  --c-gold:#2f7a90; --c-brand:#3f6f92;
-  --picked-bg:#e4eef4; --mine-bg:#e0eaf0; --mine-odd:#dae6ec;
-  --stamp-bg:rgba(255,255,255,.96);
-  --pos-qb:#1f6db3; --pos-rb:#118a67; --pos-wr:#c05e14;
-  --pos-te:#c23e7b; --pos-k:#79842a; --pos-def:#a67d1c; --pos-flx:#7b3fd4;
-  --posbg-qb:#e3eefb; --posbg-rb:#e0f2ec; --posbg-wr:#f9e9dc;
-  --posbg-te:#f9e3ef; --posbg-k:#eef0d8; --posbg-def:#f7ecd2;
+  /* THE PRINTED SHEET: a warm-paper daylight mode, not a pale dark theme.
+     Bone/cream stock, warm-black ink, tan rule lines, one confident ink-navy
+     accent. It reads like the draft almanac you would print and mark up,
+     which is exactly this app's offline paper-backup identity. */
+  --ground:#e9e1d0; --zebra:#e1d8c4; --surface:#f7f1e3; --raised:#efe8d8;
+  --input:#fcf8ef;
+  --sel:#e5dcc2; --focus:#294c72;
+  --line:#cbbfa4; --line-soft:#ded4bd;
+  --text:#2a2620; --muted:#6c6353; --faint:#9a907a;
+  --purple:#2c4a6e; --purple-soft:#ddd3ba;
+  --gold:#294c72; --gold-hi:#1c3a5b; --gold-dim:#aab6c6;
+  --good:#2b6a44; --bad:#9c3d30; --warn:#8a5a12;
+  /* chrome (masthead band + rail): a deeper kraft/manila, like the toned
+     header strip of a printed form, framing the paper board */
+  --c-bg:#dacfb2; --c-panel:#d1c5a6; --c-line:#b4a582;
+  --c-text:#2e281d; --c-muted:#6f6450; --c-chip:#e7ddc6;
+  --c-gold:#294c72; --c-brand:#294c72;
+  --picked-bg:#ece1c5; --mine-bg:#e9dfc9; --mine-odd:#e3d9c1;
+  --stamp-bg:rgba(250,246,236,.96);
+  --pos-qb:#1f5f96; --pos-rb:#1a7a5a; --pos-wr:#b3541a;
+  --pos-te:#a83c6b; --pos-k:#6f7826; --pos-def:#9a7218; --pos-flx:#6a3fa0;
+  --posbg-qb:#dde6ee; --posbg-rb:#dde9dc; --posbg-wr:#f1e3ce;
+  --posbg-te:#f0dfe2; --posbg-k:#e9e6cd; --posbg-def:#efe5cb;
   --disp:"Copperplate","Copperplate Gothic Bold",Georgia,serif;
   --ui:Verdana,Geneva,"DejaVu Sans",sans-serif;
   --mono:Menlo,"SF Mono",Consolas,monospace;
@@ -63,6 +66,12 @@
 :root[data-theme="dark"] #rail{
   --surface:#1a232d; --zebra:#1f2833; --raised:#26313d;
   --line:#2f3b47; --line-soft:#28323d; --input:#12181f;
+}
+/* light-theme sidebar: warmer kraft stock with lighter paper cards, so the
+ * rail reads as the folder the sheet sits in (mirrors the dark rail). */
+:root:not([data-theme="dark"]) #rail{
+  --surface:#efe7d6; --zebra:#e7ddc8; --raised:#f4eede;
+  --line:#c6b795; --line-soft:#d9cdb1; --input:#f9f4ea;
 }
 *{box-sizing:border-box;margin:0}
 html,body{height:100%}
@@ -529,8 +538,8 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
 /* ---------- modal head + favorite toggle + tabs ---------- */
 #mtable .pos{color:var(--good);font-weight:700}
 #mtable .neg{color:var(--bad);font-weight:700}
-.mhead{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.mhl{display:flex;align-items:center;gap:10px;min-width:0}
+.mhead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.mhl{display:flex;align-items:flex-start;gap:10px;min-width:0}
 .mhname{min-width:0}
 .mhname h3{margin:0}
 #mclose{font-size:24px;line-height:1;color:var(--muted);padding:0 4px}
@@ -619,7 +628,7 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
 <div id="errbar"></div>
 <header>
   <div id="mast">LIQUID SHEETS<small id="spendline">AUCTION DRAFT VALUES</small></div>
-  <span class="ver">V30 (parity)</span>
+  <span class="ver">V33 (parity)</span>
   <div id="hleft"></div>
   <span class="hspace"></span>
   <div id="hcenter"></div>

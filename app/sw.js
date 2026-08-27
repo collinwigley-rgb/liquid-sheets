@@ -4,7 +4,7 @@
  * own Sleeper/import fetches, and any self-host copilot server) goes to the
  * network and is never cached. */
 
-const CACHE = "liquid-sheets-v30";
+const CACHE = "liquid-sheets-v33";
 const SHELL = [
   "/app/",
   "/app/index.html",
