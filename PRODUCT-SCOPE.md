@@ -33,7 +33,7 @@ Buckets: **AS-IS** (port faithfully) / **GENERALIZED** (survives, reshaped for a
 | Server-side scrapers (ESPN kona, CBS read_html) | CUT | No server exists; replaced by user-side export/paste |
 | Yahoo API integration | CUT | Requires backend and app approval; against the no-backend constraint |
 | AI news sweep + generated opinions | CUT | We do not ship AI-generated content about real players to the public; see co-pilot row |
-| Player tags / flagged players | GENERALIZED | Survives as user-entered tags and notes; the UI stays, the shipped content goes |
+| Player tags / flagged players | CUT (2026-08-26) | Removed with the whole news/noise layer. Replaced by a Favorites list you build from the research popup (star a player); no tags, notes, or opinions anywhere |
 
 ## Draft room
 
@@ -63,8 +63,8 @@ Resolved at ratification via [ADR-0004](docs/adr/0004-one-app-plus-post-launch-p
 | Feature | Bucket | Rationale |
 |---|---|---|
 | Deterministic flow read (runs, temperature, crunch, hoarders, pace) | SHIPS | Contains no AI; pure ledger heuristics, ported as ordinary code. Lives in the top-bar pressure strip and needs no key |
-| Pre-computed AI opinions shipped in-app | CUT | We never ship AI-generated takes on real players; users generate their own and import them via the tags/opinions hook |
-| Opinions/tags import hook | SHIPS | Path E writes to `doc.tags`, which feeds the Flagged Players panel, the player modal profile block, and The Call's tag chips; the app ships none of its own |
+| Pre-computed AI opinions shipped in-app | CUT | We never ship AI-generated takes on real players |
+| Opinions/tags import hook (news & noise) | CUT (2026-08-26) | The entire opinions/news-noise layer was removed: no import, no `doc.tags`, no modal profile block, no Call tag chips. It read as a shipped-AI-content risk with no clean data source, and Favorites cover the "mark players I care about" need without any research content |
 | Live "reading the room" | SELF-HOST ONLY | Resolved by [ADR-0006](docs/adr/0006-ai-copilot-self-hosted-companion-not-in-app.md): no in-app key UX. The hosted app is AI-free; developers run `copilot-server/` against their own AI and set `app/config.js` `AI_ENDPOINT` |
 | Power kit (published copilot server + prompts, personal-use ingestion scripts) | PARTIAL | `copilot-server/` (server + the synthesize/complement prompts) now ships in-repo; the ingestion scripts remain a post-launch encore per [ADR-0004](docs/adr/0004-one-app-plus-post-launch-power-kit.md) |
 

@@ -6,12 +6,11 @@
 <title>Liquid Sheets</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#128167;</text></svg>">
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#5b4397">
+<meta name="theme-color" content="#12171e">
 <style>
-/* Tokens ported from the original (levi-sheet/draftroom/app.html, V56):
- * paper-ledger light set, split DATA vs CHROME, plus the dark theme. Light is
- * the default (no data-theme attr); dark is an explicit choice set by the gear
- * toggle via document.documentElement.dataset.theme (V55 retired focus/inverted). */
+/* Split DATA vs CHROME tokens. DARK is the default (data-theme="dark" on the
+ * root); light is the opt-out, set by the gear toggle via
+ * document.documentElement.dataset.theme. Bare :root holds the light palette. */
 :root{
   /* data area: neutral light greys with crisp white panels (no warm tones) */
   --ground:#eef0f2; --zebra:#e6e9ec; --surface:#ffffff; --raised:#e3e6ea;
@@ -84,7 +83,11 @@ header{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;
 #mast small{display:block;font-family:var(--ui);font-size:9px;
   letter-spacing:.26em;color:var(--c-muted);font-weight:700}
 header .ver{color:var(--c-muted);font-size:10px;font-family:var(--mono)}
-.gearwrap{position:relative;margin-left:auto}
+.gearwrap{position:relative}
+.hspace{flex:1}
+#hleft{display:flex;gap:8px;align-items:center}
+#hleft:empty,#hcenter:empty{display:none}
+#hcenter{display:flex;align-items:center}
 #gearbtn{display:inline-flex;align-items:center;padding:7px 9px;
   border:1px solid var(--c-line);border-radius:4px;background:var(--c-chip);
   color:var(--c-muted)}
@@ -471,12 +474,9 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
   color:var(--faint);font-size:14px;padding:0 3px;line-height:1}
 .colbtn:hover{color:var(--text)}
 
-/* ---------- top chips (run selector + status, on the masthead line) ------- */
-#topchips{display:flex;gap:8px;align-items:center;margin-left:auto}
-#topchips:empty{display:none}
-/* ---------- flow strip (top of the rail, above the staging card) ---------- */
-#flow{display:flex;flex-wrap:wrap;gap:5px;align-items:center;padding:2px 2px 6px}
-#flow:empty{display:none;padding:0}
+/* ---------- flow strip (right side of the masthead line, before the gear) -- */
+#flow{display:flex;gap:5px;align-items:center}
+#flow:empty{display:none}
 .fcell{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;
   font-size:11px;color:var(--c-muted);border:1px solid var(--c-line);
   border-radius:4px;padding:3px 7px;background:var(--c-chip);cursor:default}
@@ -501,12 +501,6 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
 .cslots .srow{display:flex;justify-content:space-between;align-items:center;
   font-size:13px;margin:2px 0;font-family:var(--mono)}
 .cslots .pl{font-weight:700}
-.ctags{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}
-.ctags span{font-size:10px;letter-spacing:.1em;text-transform:uppercase;
-  border:1px solid var(--line);border-radius:3px;padding:2px 6px;
-  color:var(--muted)}
-.ctags .tneg{border-color:var(--bad);color:var(--bad)}
-.ctags .tpos{border-color:var(--good);color:var(--good)}
 
 /* ---------- roster plan projections ---------- */
 #roster .slot .pl{color:var(--faint);font-weight:400;cursor:help}
@@ -518,39 +512,32 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
 .obtn.dim{opacity:.35}
 .obtn.hit{outline:1px solid var(--gold)}
 
-/* ---------- flagged players ---------- */
-.note{display:flex;gap:8px;align-items:center;width:100%;padding:4px 2px;
-  font-size:13px;text-align:left;border-radius:3px;position:relative}
-.note:hover{background:var(--sel)}
-.note[data-tip]:hover::after{content:attr(data-tip);position:absolute;
-  left:22px;bottom:calc(100% - 2px);z-index:5;white-space:nowrap;
-  background:var(--raised);border:1px solid var(--line);border-radius:3px;
-  padding:3px 8px;font-size:11px;letter-spacing:.05em;text-transform:uppercase;
-  color:var(--muted);pointer-events:none}
-.note .flag{width:22px;text-align:center;font-family:var(--mono);font-size:12px;
-  font-weight:700;border-radius:3px;padding:1px 0}
-.note .flag.up{color:var(--good)}
-.note .flag.dn{color:var(--bad)}
-.note .flag.mix{color:var(--warn)}
-.note .n{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.note .n .tm{color:var(--faint);font-size:11px;margin-left:4px}
-.note .d{font-family:var(--mono);font-size:12px;color:var(--gold);
+/* ---------- favorites panel ---------- */
+.favrow{display:flex;gap:8px;align-items:center;width:100%;padding:4px 2px;
+  font-size:13px;text-align:left;border-radius:3px}
+.favrow:hover{background:var(--sel)}
+.favrow:nth-child(odd){background:var(--zebra)}
+.favrow.out{opacity:.45}
+.favrow .star{width:14px;text-align:center;color:var(--pos-def);font-size:12px}
+.favrow .n{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.favrow .n .tm{color:var(--faint);font-size:11px;margin-left:4px}
+.favrow .d{font-family:var(--mono);font-size:12px;color:var(--gold);
   font-weight:700}
-.note:nth-child(odd){background:var(--zebra)}
+/* favorite star on a board row */
+.row .favm{color:var(--pos-def);font-size:11px;margin-left:4px}
 
-/* ---------- modal profile + tabs ---------- */
+/* ---------- modal head + favorite toggle + tabs ---------- */
 #mtable .pos{color:var(--good);font-weight:700}
 #mtable .neg{color:var(--bad);font-weight:700}
-#mtable tr.hdr td{color:var(--faint);font-size:10px;letter-spacing:.1em;
-  text-transform:uppercase}
-#mprofile{margin-top:12px;padding:10px 12px;border-left:3px solid var(--line);
-  background:var(--surface);font-size:13.5px;line-height:1.55;color:var(--muted)}
-#mprofile b{color:var(--muted);font-size:10px;letter-spacing:.2em;display:block;
-  margin-bottom:4px}
-.ptags{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
-.ptags span{font-size:10px;letter-spacing:.06em;text-transform:uppercase;
-  border:1px solid var(--line);border-radius:3px;padding:2px 6px;
-  color:var(--muted)}
+.mhead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.mhl{display:flex;align-items:center;gap:10px;min-width:0}
+.mhname{min-width:0}
+.mhname h3{margin:0}
+#mclose{font-size:24px;line-height:1;color:var(--muted);padding:0 4px}
+#mclose:hover{color:var(--text)}
+#mfav{font-size:22px;line-height:1;color:var(--faint);padding:0 2px}
+#mfav:hover{color:var(--pos-def)}
+#mfav.on{color:var(--pos-def)}
 #mtabs{display:flex;gap:6px;margin:2px 0 12px}
 .mtab{font-size:11px;font-weight:700;letter-spacing:.14em;color:var(--faint);
   padding:5px 12px;border:1px solid var(--line);border-radius:4px;
@@ -591,21 +578,33 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
   border:1px solid var(--line);border-radius:4px;padding:6px 8px;font:inherit}
 #modal input:focus,#modal select:focus{border-color:var(--focus);outline:none}
 
-/* ---------- My Calls stepper inside the player popup ---------- */
+/* ---------- My Call: set-a-value input in the player popup ---------- */
 #mcalls{margin-top:14px;padding-top:12px;border-top:1px solid var(--line-soft)}
 #mcalls b{color:var(--muted);font-size:10px;letter-spacing:.2em;display:block;
   margin-bottom:8px}
-.callstep{display:flex;align-items:center;gap:6px}
-.callstep .cstep{width:38px;padding:7px 0;border:1px solid var(--line);
-  border-radius:5px;font-family:var(--mono);font-size:13px;font-weight:700;
+.callset{display:flex;align-items:center;gap:8px}
+.callset .cstep{width:34px;height:38px;border:1px solid var(--line);
+  border-radius:6px;font-family:var(--mono);font-size:18px;font-weight:700;
   color:var(--muted);background:var(--input)}
-.callstep .cstep.up:hover{color:var(--good);border-color:var(--good)}
-.callstep .cstep.dn:hover{color:var(--bad);border-color:var(--bad)}
-.callstep .cdelta{flex:1;text-align:center;font-family:var(--mono);
-  font-size:16px;font-weight:700;color:var(--faint)}
-.callstep .cdelta.up{color:var(--good)}
-.callstep .cdelta.dn{color:var(--bad)}
-.chint{color:var(--faint);font-size:12px;margin-top:8px;line-height:1.4}
+.callset .cstep:hover{color:var(--text);border-color:var(--focus)}
+.cval{display:flex;align-items:center;gap:2px;border:1px solid var(--gold-dim);
+  border-radius:6px;background:var(--input);padding:0 8px}
+.cval .cd{font-family:var(--mono);color:var(--gold);font-size:18px;
+  font-weight:700}
+.cval input{width:56px;border:none;background:none;outline:none;text-align:left;
+  font-family:var(--mono);font-size:20px;font-weight:700;color:var(--gold);
+  padding:8px 0}
+.callbtns{display:flex;gap:8px;margin-top:12px}
+.callbtns #callclear{flex:1}
+.callbtns #callsave{flex:2}
+.callbtns #callclear:not(:disabled){color:var(--text);border-color:var(--focus)}
+.callbtns #callclear:not(:disabled):hover{background:var(--surface)}
+.chint{color:var(--faint);font-size:12px;margin-top:10px;line-height:1.4}
+/* board marker for a called player */
+.row .callm{font-family:var(--mono);font-size:10px;font-weight:700;
+  margin-left:4px;padding:0 3px;border-radius:3px}
+.row .callm.up{color:var(--good);border:1px solid var(--good)}
+.row .callm.dn{color:var(--bad);border:1px solid var(--bad)}
 /* board marker for a called player */
 .row .callm{font-family:var(--mono);font-size:10px;font-weight:700;
   margin-left:4px;padding:0 3px;border-radius:3px}
@@ -620,8 +619,12 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
 <div id="errbar"></div>
 <header>
   <div id="mast">LIQUID SHEETS<small id="spendline">AUCTION DRAFT VALUES</small></div>
-  <span class="ver">V19 (parity)</span>
-  <div id="topchips"></div>
+  <span class="ver">V30 (parity)</span>
+  <div id="hleft"></div>
+  <span class="hspace"></span>
+  <div id="hcenter"></div>
+  <span class="hspace"></span>
+  <div id="flow" title="room currents, recomputed after every sale: runs, hot/cold positions, crunches, hoarders, pace"></div>
   <span class="gearwrap">
     <button id="gearbtn" aria-label="Menu">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>

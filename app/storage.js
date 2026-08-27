@@ -30,8 +30,8 @@ export async function loadDoc() {
  * (or an imported older backup) keeps loading. Idempotent and non-destructive:
  * only fills what is missing; never rewrites recorded runs or the journal. */
 export function migrate(doc) {
-  if (!doc.calls) doc.calls = [];        // named bets (my-calls mechanism); empty
-  if (!doc.tags) doc.tags = {};          // pid -> {tags, note, opinion}; Path E sink
+  if (!doc.calls) doc.calls = [];        // My Calls: [{pid, delta}]; empty
+  if (!doc.favorites) doc.favorites = []; // favorited player ids
   if (!doc.ui) doc.ui = {};
   /* dark is the default color scheme. themeChosen distinguishes a real user
    * choice from the old hardcoded default, so pre-theme docs flip to dark while
@@ -76,8 +76,8 @@ export function newDoc() {
     sources: {},           // source name -> {as_of, players: [...]}
     runs: [],              // append-only; never mutate a recorded run
     journal: [],           // append-only sale journal (M3)
-    calls: [],             // named bets {name,pos,thesis,points?,adjust?}; empty
-    tags: {},              // pid -> {tags:[], note, opinion}; Path E import sink
+    calls: [],             // My Calls: [{pid, delta}]; empty
+    favorites: [],         // favorited player ids
     ui: { theme: "dark", themeChosen: false, run: null,
       planVariant: "default" },
   };
