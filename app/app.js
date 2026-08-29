@@ -71,12 +71,31 @@ function renderWizard() {
     const n = $(s); if (n) n.innerHTML = "";
   });
   const box = el("div", "wizard");
-  const crumbs = el("div", "crumbs");
+  /* Stepper: sets the expectation up front (how many steps, where you are)
+   * so setup reads as a short, finite procedure rather than a form. */
+  const cur = wizardState.step;
+  const stepper = el("div", "stepper");
+  const meta = el("div", "stepmeta");
+  meta.innerHTML = `<b>Step ${cur + 1} of ${STEPS.length}</b>` +
+    `<span>${STEPS[cur]}</span>`;
+  stepper.appendChild(meta);
+  const bar = el("div", "stepbar");
+  const fill = el("div", "stepfill");
+  fill.style.width = `${((cur + 1) / STEPS.length) * 100}%`;
+  bar.appendChild(fill);
+  stepper.appendChild(bar);
+  const labels = el("div", "steps");
   STEPS.forEach((s, i) => {
-    const c = el("span", i === wizardState.step ? "crumb on" : "crumb", s);
-    crumbs.appendChild(c);
+    const cls = i < cur ? "step done" : i === cur ? "step on" : "step";
+    labels.appendChild(el("span", cls, s));
   });
-  box.appendChild(crumbs);
+  stepper.appendChild(labels);
+  box.appendChild(stepper);
+  if (cur === 0) {
+    box.appendChild(el("p", "wizintro",
+      "Five quick steps to a board built for your league. Defaults are " +
+      "filled in; change only what differs from your league."));
+  }
   const body = el("div", "wizbody");
   box.appendChild(body);
   const nav = el("div", "wiznav");
