@@ -23,8 +23,10 @@ Requires the dev server up (./dev.sh) and Playwright chromium installed.
 Exits nonzero if any check fails.
 """
 
+import os
 import re
 import sys
+from urllib.parse import urlsplit
 from playwright.sync_api import sync_playwright
 
 
@@ -33,8 +35,12 @@ def has_version(text):
     version-agnostic so a routine version bump never fails the gauntlet."""
     return bool(text) and re.search(r"\bV\d+", text) is not None
 
-BASE = "http://localhost:8013/app/"
-ORIGIN = "http://localhost:8013"
+# Target the local dev server by default; set GAUNTLET_BASE to smoke-test a
+# deployed URL (for example https://liquid-sheets.pages.dev/app/). ORIGIN is
+# derived so the same-origin and cross-origin checks follow the target.
+BASE = os.environ.get("GAUNTLET_BASE", "http://localhost:8013/app/")
+_split = urlsplit(BASE)
+ORIGIN = f"{_split.scheme}://{_split.netloc}"
 
 results = []
 

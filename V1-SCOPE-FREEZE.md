@@ -116,7 +116,8 @@ loose end that would otherwise make "frozen" untrue.
 
 - [ ] Levi signs off on this scope line.
 - [x] Reconcile `PRODUCT-SCOPE.md` themes row (4 -> light+dark, frozen at `1669bc2`) and confirm the tags-cut rows read as frozen, so the two docs agree. Done 2026-08-27; MASTER-PLAN learnings note added.
-- [x] Run the gauntlet. Executed 2026-08-27 in real headless Chromium; results in `GAUNTLET-v1.md`.
+- [x] Run the gauntlet. Executed 2026-08-27 in real headless Chromium; results in `GAUNTLET-v1.md`. Re-run 2026-08-29 against the live Cloudflare deployment (https://liquid-sheets.pages.dev/app/), 15/15.
+- [ ] Human wizard pass on the live site: build two differently-shaped leagues end to end, confirm both boards. Deferred to the live site per Levi's "get it live and test there" call.
 
 Phase 4B (brand) and the post-Sept harvest are deferred by this doc and do NOT block
 the freeze; they are v1.1 inputs.
