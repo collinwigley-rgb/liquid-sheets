@@ -1,0 +1,6 @@
+# No landing page: the bare domain goes straight into the app. The app lives
+# at /app/ (the service worker scope and PWA start_url are both /app/). 302
+# (temporary) so nothing caches the root behavior permanently. Honored by
+# Cloudflare Pages (and Netlify) with identical syntax; the root index.html is
+# a meta-refresh fallback for anything that ignores this file.
+/    /app/    302

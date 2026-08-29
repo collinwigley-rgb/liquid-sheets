@@ -12,7 +12,7 @@ actually do X" page.
 | Repo | `github.com/liquid-workflows/liquid-sheets` (org owned by Levi) |
 | Local path | `Documents/claude-projects/fantasy-football/liquid-sheets-public/` |
 | Type | Static, client-side-only PWA. No build step, no backend, no package.json |
-| App entry | app at `/<host>/app/`; a landing page (`index.html`) sits at the domain root |
+| App entry | served at `/<host>/app/`; the bare domain redirects straight into `/app/` (no landing page) |
 | Host | Cloudflare Pages, git-connected, auto-deploys on push to `main` |
 | Dev server | `./dev.sh` -> `http://localhost:8013/app/` (port 8013 is dedicated) |
 | Engine | `engine/engine.js`, byte-identical to the private Python engine (golden master) |
@@ -92,9 +92,10 @@ normal flow.
 - **Path constraint (do not break):** the app is served at `/app/` and the service
   worker scope and PWA `start_url`/`scope` are all absolute `/app/`. The site must
   be served from a domain root (custom domain or `*.pages.dev`), NOT a subpath like
-  `user.github.io/liquid-sheets/`, or the absolute paths break. The domain root
-  serves a landing page (`index.html` at the repo root) whose call to action links
-  into `/app/`; the app itself lives under `/app/`.
+  `user.github.io/liquid-sheets/`, or the absolute paths break. There is no landing
+  page: the bare domain redirects into `/app/` via `_redirects` (Netlify/CF syntax)
+  with a root `index.html` meta-refresh as a fallback. Informing and guiding the
+  user is the app's own job (wizard, under-the-hood explainer), not a marketing page.
 - **First-time CF Pages setup** (already done once; recorded here for a rebuild):
   CF dashboard -> Workers & Pages -> Pages -> Connect to Git -> authorize the
   **liquid-workflows** org -> pick `liquid-sheets`. Build settings: framework
