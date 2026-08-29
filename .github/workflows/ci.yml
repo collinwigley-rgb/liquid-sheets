@@ -1,0 +1,75 @@
+# Continuous integration for Liquid Sheets (public static PWA).
+#
+# What runs here:
+#   - static-checks: node --check on every JS module + the no-dash/non-ASCII
+#     rule. Fast, no dependencies.
+#   - gauntlet: the browser half of the acceptance gauntlet in real headless
+#     Chromium (AI-absent proof, offline/airplane, tab-kill persistence,
+#     delete-data + import recovery). It builds its own test doc, so it needs
+#     no licensed fixtures.
+#
+# What does NOT run here, on purpose:
+#   - The engine golden master (verify/run_golden.mjs). Its fixtures embed
+#     licensed projection data and are gitignored (verify/fixtures*/), so CI
+#     cannot reproduce them. Golden master stays a LOCAL gate, run before any
+#     engine-adjacent change. See RUNBOOK.md and verify/README.md.
+#
+# CI is a signal, not a deploy gate: Cloudflare Pages deploys on push to main
+# independently of this workflow's status.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: node --check every JS module
+        run: |
+          for f in app/*.js engine/*.js verify/*.mjs; do
+            echo "check $f"
+            node --check "$f"
+          done
+      - name: no em/en dashes or non-ASCII in shipped code
+        run: |
+          if grep -rlP '[\x{2014}\x{2013}]|[^\x00-\x7F]' app/ engine/; then
+            echo "::error::found an em/en dash or non-ASCII byte in a shipped file"
+            exit 1
+          fi
+          echo "clean"
+
+  gauntlet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: install playwright + chromium
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: serve the app and run the browser gauntlet
+        run: |
+          python3 -m http.server 8013 --directory . &
+          server_pid=$!
+          for _ in $(seq 1 30); do
+            curl -sf http://localhost:8013/app/ >/dev/null && break
+            sleep 1
+          done
+          python3 verify/gauntlet/run_gauntlet.py
+          status=$?
+          kill "$server_pid" 2>/dev/null || true
+          exit $status

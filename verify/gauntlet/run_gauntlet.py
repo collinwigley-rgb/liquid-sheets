@@ -23,8 +23,15 @@ Requires the dev server up (./dev.sh) and Playwright chromium installed.
 Exits nonzero if any check fails.
 """
 
+import re
 import sys
 from playwright.sync_api import sync_playwright
+
+
+def has_version(text):
+    """True if the masthead text carries a V<number> tag (any version). Kept
+    version-agnostic so a routine version bump never fails the gauntlet."""
+    return bool(text) and re.search(r"\bV\d+", text) is not None
 
 BASE = "http://localhost:8013/app/"
 ORIGIN = "http://localhost:8013"
@@ -123,7 +130,7 @@ def main():
 
         # ---- TEST: shell actually rendered (stable anchor) ----
         ver = page.eval_on_selector(".ver", "el => el.textContent") if page.query_selector(".ver") else None
-        check("shell renders (masthead version present)", ver is not None and "V34" in (ver or ""),
+        check("shell renders (masthead version present)", has_version(ver),
               f"masthead={ver!r}")
 
         # ---- TEST: AI-absent proof ----
@@ -181,7 +188,7 @@ def main():
             offline_ok = False
             offline_detail = f"reload threw: {e}"
         ver_off = page.eval_on_selector(".ver", "el => el.textContent") if page.query_selector(".ver") else None
-        shell_ok = ver_off is not None and "V34" in (ver_off or "")
+        shell_ok = has_version(ver_off)
         shell_failed = [u for u in failed if u.startswith(ORIGIN)]
         check("offline: app shell still renders", offline_ok and shell_ok,
               offline_detail or f"masthead={ver_off!r}")
