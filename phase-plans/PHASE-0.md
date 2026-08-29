@@ -1,6 +1,6 @@
 # Phase 0 Execution Plan: Charter and repo setup
 
-Status: COMPLETE (2026-08-18). All steps done. Published to https://github.com/LeviZ/liquid-sheets (personal account, confirmed by Levi).
+Status: COMPLETE (2026-08-18). All steps done. Originally published to the personal LeviZ account; transferred to the liquid-workflows org 2026-08-29, now at https://github.com/liquid-workflows/liquid-sheets.
 Parent: [MASTER-PLAN.md](../MASTER-PLAN.md)
 
 ## Inputs already decided by Levi (2026-08-18)
