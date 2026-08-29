@@ -1,5 +1,0 @@
-# Send the bare domain into the app. The app lives at /app/ (the service
-# worker scope and the PWA start_url are both /app/). 302 (temporary) during
-# launch so nothing caches the root behavior while the site is still moving.
-# This file is honored by Netlify and Cloudflare Pages with identical syntax.
-/    /app/    302
