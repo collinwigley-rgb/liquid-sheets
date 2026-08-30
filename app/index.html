@@ -106,14 +106,14 @@ header{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;
 /* teams step: reorderable list */
 .teamlist{display:flex;flex-direction:column;gap:4px;max-height:52vh;overflow:auto;
   padding-right:2px}
-.trow{display:grid;grid-template-columns:18px 1fr auto auto;gap:8px;align-items:center;
+.trow{display:grid;grid-template-columns:18px 1fr 34px 62px;gap:8px;align-items:center;
   padding:3px 6px 3px 4px;border:1px solid var(--line-soft);border-radius:6px;
   background:var(--raised)}
 .trow.thead{background:transparent;border-color:transparent;padding-top:0;padding-bottom:2px;
   font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
 .trow.thead span:nth-child(2){padding-left:8px}
-.trow.thead span:nth-child(3){text-align:center;min-width:34px}
-.trow .melab{justify-content:center;min-width:34px}
+.trow.thead span:nth-child(3){text-align:center}
+.trow .melab{justify-content:center}
 .trow.isme{border-color:var(--gold-dim)}
 .trow.drag{opacity:.4}
 .trow.over{border-color:var(--gold);box-shadow:inset 0 2px 0 var(--gold)}
