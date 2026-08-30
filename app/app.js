@@ -1641,7 +1641,7 @@ function advise(p) {
       cls = "pass"; label = "LET HIM GO"; max = val;
     } else if (cliffPressure) {
       cls = "last"; label = "LAST CHANCE"; max = val;
-      reasons.push(`only ${comparable} comparable ${p.pos}s left`
+      reasons.push(`only ${comparable} comparable ${p.pos}${comparable === 1 ? "" : "s"} left`
         + (drop != null ? ` before a $${drop} drop` : "")
         + ` and ${contest} funded owners still need one; paying full value is correct here`);
     } else if (deal != null && deal >= 2) {
@@ -1650,7 +1650,7 @@ function advise(p) {
       cls = "value"; label = "FAIR VALUE"; max = val;
     }
     if (comparable != null && !cliffPressure) {
-      reasons.push(`${comparable} comparable ${p.pos}s left, `
+      reasons.push(`${comparable} comparable ${p.pos}${comparable === 1 ? "" : "s"} left, `
         + `${contest} funded owner${contest === 1 ? "" : "s"} fighting for them`);
     }
   }

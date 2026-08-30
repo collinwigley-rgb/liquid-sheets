@@ -1,79 +1,87 @@
 # Reddit post - DRAFT (not posted)
 
-Status: draft for Levi's review. Not posted anywhere. Framed for a live launch (the app is public at https://liquid-sheets.pages.dev/).
+Status: draft for Levi's review. Not posted anywhere. Framed for a live launch
+(the app is public at https://liquid-sheets.pages.dev/).
 
-Notes before posting:
-- The app is live (README status is "live", the repo is public). This draft is
-  framed as a real launch asking for feedback, not an "early look".
-- r/fantasyfootball is strict on self-promotion (tool posts usually need mod
-  approval or the weekly tools thread); r/FFCommish and r/DynastyFF are friendlier
-  to open-source tools. Read the current rules of whichever sub before posting.
-- Swap `<URL>` for the live link (currently https://liquid-sheets.pages.dev/app/,
-  or the custom domain once wired).
-- Keep it ASCII (no em dashes) if pasted from here; Reddit does not care, but
-  the project rule does.
+## How to think about this draft
+
+The goal is hook fast, then SHOW, don't tell. Put the reader inside a draft and
+let the screenshots do the talking. Nobody reads a wall of text about why a
+feature is good; they believe a picture of the feature doing the thing. The copy
+below is deliberately short and exists mostly to frame two screenshots.
+
+Screenshots to attach (already generated, in the scratchpad; regenerate with your
+own scoring/values any time):
+- `shot_call.png` - The Call on a staged player (the hero image). Goes right
+  after the "four seconds" paragraph.
+- `shot_board.png` - the full board (your custom values, tiers, plan, ledger).
+  Goes after the "every value is built from projections you bring" paragraph.
+- Optional third: a board with your real Yahoo/ESPN values pasted, so the Bid$
+  and +/- columns light up with green deals. I did not fake those numbers; paste
+  your league's and screenshot it if you want the "find the deals" shot.
+
+Posting notes:
+- Post as an image/gallery post (or a text post with the images inline). Reddit
+  rewards a strong first image.
+- Swap the link for your final URL (the custom subdomain once it is wired, else
+  https://liquid-sheets.pages.dev/).
+- r/fantasyfootball is strict on tool self-promo (often needs mod approval or the
+  weekly tools thread). r/FFCommish and r/DynastyFF are friendlier to open-source
+  tools. Read the current rules of whichever sub before posting.
+- The app is live; this is framed as a real launch asking for feedback.
 
 ---
 
-**Title options (pick one):**
+## Title options (pick one)
 
-1. I built a free auction draft tool that runs entirely in your browser (no account, nothing uploaded). Here is how it works.
-2. Open-source auction draft tool: bring your own projections, it does the math, everything stays in your browser
-3. A BeerSheets-style auction board that can't get killed by data licensing (because it never hosts any data)
+1. I'm a data engineer who got tired of BeerSheets, so I spent a month building my own auction draft tool. It's free, no login, and it never leaves your browser.
+2. I built the auction draft tool I always wished BeerSheets was. Free, private, runs entirely in your browser.
+3. Reverse-engineered my own auction values and built a draft-day tool around them. Free, open source, no account, nothing uploaded.
+
+## TL;DR (put this line at the very top of the body)
+
+**Free auction-draft tool. No login, runs entirely in your browser (nothing uploaded, nothing saved on a server). Bring your own projections, it does the draft-day math. Link at the bottom.**
+
+## Body
+
+I am a data engineer. I have drafted off BeerSheets for years, and every year I wanted it to do more, so about a month ago I started building my own. I only meant to give myself an edge in my own league. It came out better than I expected, so here it is.
+
+Here is the thing it does that I cannot do in my head at the table.
+
+It is early in your auction and someone nominates Bijan Robinson. You have about four seconds. The tool already knows: he is worth $68 to your roster, only one comparable back is left before the tier falls off an $8 cliff, and eleven other funded teams still need a starting RB. The read: this is your last real shot at that tier, so pay full value.
+
+[SCREENSHOT: shot_call.png]
+
+That is not a ranking. It is a read on scarcity, your budget, and the room, done in the half second between the nomination and your bid. Nominate a player (type his name, hit enter) and it fires instantly.
+
+And the value it is reading from is yours, not a generic sheet. Every number is built from projections you bring (one click pulls Sleeper's, or paste FantasyPros, CBS, or your own), re-scored under your league's exact settings, and scaled to your budget and roster. Paste your league's Yahoo or ESPN values on top and it shows you which players the room is about to underpay for.
+
+[SCREENSHOT: shot_board.png]
+
+A few things that mattered to me, since I did not want to build another account to manage:
+
+- **Free.** No login, no paywall, nothing to sign up for.
+- **It lives only in your browser.** Nothing is uploaded, nothing is stored on a server, no tracking. Close the tab and your draft is right where you left it.
+- **Open source.** Every value traces back to a calculation you can open and read; there is no black box.
+
+I built it for myself, so it is auction-only and a little opinionated. If you auction draft, take it into a mock and tell me where it is wrong or where it slowed you down. That feedback is the only thing I want out of this.
+
+Link: <URL>
 
 ---
 
-**Body:**
+## A shorter alternative body (if you want the leanest possible version)
 
-I run an auction league and have spent years patching together spreadsheets. I turned my private draft tool into a free, open-source web app, and it is live now. It is new, so I would rather get feedback from people who actually auction draft than polish in a vacuum.
+I am a data engineer and a longtime BeerSheets user. I spent a month building the auction draft tool I always wanted, and it is free.
 
-Link: `<URL>` (nothing to install, no account, no cost)
+The point of it: someone nominates a player, and in the four seconds you have, it tells you what he is worth to YOUR roster, whether the tier is about to fall off a cliff, and how many other teams still need that position. A read you cannot do in your head at the table.
 
-**What it is, in one paragraph**
+[SCREENSHOT: shot_call.png]
 
-You give it your league settings and your own projections. It turns them into auction dollar values scaled to your exact budget and roster, then runs the whole draft: a live board, a verdict on every player nominated, a budget plan that adjusts as you spend, and a ledger of what every team has left. All of it is math in your browser; nothing is uploaded anywhere.
+The values are built from projections you bring, re-scored under your league's rules and budget, so they are for your league, not a generic sheet.
 
-**How the values are built (the whole model, four steps)**
+[SCREENSHOT: shot_board.png]
 
-1. **Bring your own projections, blend them.** One click pulls Sleeper's public projections. You can paste in more (FantasyPros, CBS, a spreadsheet, any rankings list). With more than one source, the board averages them, because a blend beats any single forecaster. (Yahoo/ESPN auction values go in separately as "market values" and become the Bid$ estimate, so you can see the deals.)
+No login, no cloud, nothing uploaded. It runs entirely in your browser and it is open source. Auction-only, built for myself, sharing it in case it helps you too. Tell me where it breaks.
 
-2. **Re-scored under YOUR rules.** Points are recomputed from raw stats using the scoring you entered. This is why the numbers differ from any public sheet: they are for your league, not a generic one.
-
-3. **Availability discount.** Each projection is trimmed by the games players at that draft slot historically miss. Elite RBs miss the most, and that is baked in rather than left for you to remember.
-
-4. **Points above a free player.** When the draft ends, a replacement-level player at every position is still free on waivers. Points that free player would also score are worth $0. A player is only worth his points above that line. Tiers mark real value cliffs.
-
-Then points become dollars: the room holds (teams x budget). After $1 minimums for every roster spot, the rest splits among players in proportion to surplus. Every value sums back to the room's money, so if one player is overpriced, someone else is underpriced.
-
-That is the entire model. There is no hidden sauce, and every number on the board traces back to that calculation. You can open "under the hood" in the app and read it.
-
-**What happens in the draft room**
-
-- **Nominate a player, get a verdict instantly.** Double-click a row (or type a name and hit Enter) and The Call fires: a verdict (TARGET, FAIR VALUE, LAST CHANCE, or LET HIM GO), the most you should bid, which of your open slots he fits, and how much comparable supply is left. It is arithmetic over what is already on screen, so it works offline.
-- **A budget plan that breathes.** You set target envelopes per slot (RB1, WR1, etc). As the draft unfolds they water-fill to your remaining money: bank a deal and your other envelopes grow; overpay and they shrink. A reserve is held for bench, K and DEF so a run never strands you with $3 for five spots.
-- **A pressure strip** across the top: per position, starter slots still needed league-wide vs startable players left. Amber means the window is closing, red means crunch. It flags positional runs as they happen.
-- **A deal column** if you paste a market source (Yahoo/ESPN values): my value vs the market, rescaled to your league's money supply, so you can see who the room is likely to underprice.
-- **My Calls**: if you disagree with the model on a player, nudge his dollar value up or down. It lives in a separate run so the base numbers are never touched, and you can flip between them.
-
-**Built for speed at the table**
-
-Auction drafts move fast, so data entry was designed to get out of the way:
-
-- Setup is a short wizard with defaults filled in. Most people change three or four numbers, then one click for Sleeper projections gets you to a board.
-- Projections are one click (Sleeper) or paste-anything: it detects the format, guesses the column mapping, and you confirm two dropdowns. When a site changes its export next August, you fix a dropdown instead of waiting on an app update.
-- Logging a sale is: nominated player is already staged, type the price, pick the team, Enter. Undo is a double-tap of Escape.
-- Keyboard everywhere: search-and-Enter to stage, arrow keys across the team grid, no mouse required mid-draft.
-- Everything saves on every action to your browser. Close the tab, reopen, you are exactly where you were. "Save to file" gives you a copy you own (on Chrome/Edge it re-saves to the same file silently), and that file is how you move to another device.
-
-**What it deliberately does not do**
-
-- It does not host, ship, or redistribute anyone's projections or rankings. This is the thing that killed the great sheet tools of the past. You bring your data; the tool is the engine and the room.
-- No accounts, no server, no tracking. Nothing you enter leaves your device.
-- No AI in the app. (There is an optional self-hosted companion for developers, but the hosted app has none.)
-- Auction only. No snake support, on purpose.
-
-**Ask**
-
-If you auction draft and try it in a mock, I want to know where it slowed you down or where a number looked wrong. It is MIT licensed and the repo is public, including the planning docs and the test harness that proves the engine matches the original to the dollar.
-
-Repo: https://github.com/liquid-workflows/liquid-sheets
+Link: <URL>
