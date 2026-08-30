@@ -2238,12 +2238,17 @@ function helpValue() {
   ${hstep(3, "Availability fade.",
     `<p><b>Source:</b> nflverse injury and games data crossed with
      FantasyFootballCalculator ADP, seasons 2015 to 2025, aggregated to expected
-     games missed per position (RB) and draft slot (RB6). It is by slot, not by
-     player; no one's medical history is in it. The table ships in the app
+     games missed per position and draft slot. It is by slot, not by player;
+     no one's medical history is in it. The table ships in the app
      (<code>app/prior_2026.js</code>).</p>
-     <p><b>Formula:</b> points x (17 - expected missed) / 17. The RB1 slot
-     expects 4.4 games missed, the QB1 slot 1.8, so top RBs are faded about 26%
-     and top QBs about 11%.</p>`,
+     <p><b>Formula:</b> points x (17 - expected missed) / 17. After
+     regularizing (below), the RB1 slot expects ~3.8 games missed and the QB1
+     slot ~2.1, so top RBs are faded about 22% and top QBs about 12%.</p>
+     <p><b>How much to trust it:</b> RBs missing more games than WRs is a solid,
+     position-level pattern. The slot-by-slot gradient (which RB is riskiest) is
+     underpowered on ~11 seasons, so the per-slot curve is shrunk halfway toward
+     each position's average. That keeps the part the data supports and damps
+     the part it does not. It is still a toggle if you would rather not use it.</p>`,
     `<button class="gtoggle htog ${fade ? "on" : ""}" id="availtog"><span>Apply the availability fade</span><span class="sw"><span class="knob"></span></span></button>
      <small class="hnote2">${fade ? "On: values include the fade." : "Off: raw projected points, no fade."} Flipping it recomputes the board as a new run.</small>`)}
   ${hstep(4, "Points above a free player.",
