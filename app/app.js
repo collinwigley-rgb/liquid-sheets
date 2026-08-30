@@ -51,6 +51,7 @@ const DEFAULT_KNOBS = {
 
 const wizardState = {
   step: 0,
+  editing: false,   // true when reopened from the gear to edit doc.league
   platform: "yahoo",
   teams: 12, budget: 200,
   roster: { QB: 1, RB: 2, WR: 3, TE: 1, FLEX: 1, K: 1, DEF: 1, BN: 5 },
@@ -64,6 +65,31 @@ const wizardState = {
  * actually matters. */
 const STEPS = ["League", "Roster", "Scoring", "Teams", "Data"];
 
+/* Reopen the wizard prefilled from the saved league so any setup decision
+ * can be revisited. Edit mode drops the Data step (sources are kept) and ends
+ * in "Save settings", which rewrites doc.league and recomputes values. */
+function openLeagueEditor() {
+  const L = doc.league;
+  const w = wizardState;
+  w.editing = true; w.step = 0;
+  w.teams = L.teams; w.budget = L.budget;
+  w.roster = { ...L.full_roster };
+  w.teamNames = [...L.team_names];
+  const ppr = L.scoring.rec.ppr_by_pos.RB;
+  w.preset = Object.keys(PRESETS).find((k) => PRESETS[k] === ppr) ?? "half";
+  w.knobs = {
+    pass_yd: L.scoring.pass.yd, pass_td: L.scoring.pass.td,
+    int: L.scoring.pass.int, rush_rec_yd: L.scoring.rush.yd,
+    rush_rec_td: L.scoring.rush.td, fumble_lost: L.scoring.misc.fumble_lost,
+    two_pt: L.scoring.misc.two_pt,
+  };
+  renderWizard();
+}
+
+function wizardSteps() {
+  return wizardState.editing ? STEPS.slice(0, 4) : STEPS;
+}
+
 function renderWizard() {
   const root = $("#main");
   root.innerHTML = "";
@@ -74,27 +100,30 @@ function renderWizard() {
   /* Stepper: sets the expectation up front (how many steps, where you are)
    * so setup reads as a short, finite procedure rather than a form. */
   const cur = wizardState.step;
+  const S = wizardSteps();
   const stepper = el("div", "stepper");
   const meta = el("div", "stepmeta");
-  meta.innerHTML = `<b>Step ${cur + 1} of ${STEPS.length}</b>` +
-    `<span>${STEPS[cur]}</span>`;
+  meta.innerHTML = `<b>Step ${cur + 1} of ${S.length}</b>` +
+    `<span>${S[cur]}</span>`;
   stepper.appendChild(meta);
   const bar = el("div", "stepbar");
   const fill = el("div", "stepfill");
-  fill.style.width = `${((cur + 1) / STEPS.length) * 100}%`;
+  fill.style.width = `${((cur + 1) / S.length) * 100}%`;
   bar.appendChild(fill);
   stepper.appendChild(bar);
   const labels = el("div", "steps");
-  STEPS.forEach((s, i) => {
+  S.forEach((s, i) => {
     const cls = i < cur ? "step done" : i === cur ? "step on" : "step";
     labels.appendChild(el("span", cls, s));
   });
   stepper.appendChild(labels);
   box.appendChild(stepper);
   if (cur === 0) {
-    box.appendChild(el("p", "wizintro",
-      "Five quick steps to a board built for your league. Defaults are " +
-      "filled in; change only what differs from your league."));
+    box.appendChild(el("p", "wizintro", wizardState.editing
+      ? "Editing league settings. Your sources, sales, calls and favorites " +
+        "are kept; values are recomputed when you save."
+      : "Five quick steps to a board built for your league. Defaults are " +
+        "filled in; change only what differs from your league."));
   }
   const body = el("div", "wizbody");
   box.appendChild(body);
@@ -107,30 +136,45 @@ function renderWizard() {
 }
 
 function navButtons(nav, { back = true, next = "Next", onNext }) {
+  const left = el("div", "wizleft");
   if (back && wizardState.step > 0) {
     const b = el("button", "ghost", "Back");
     b.onclick = () => { wizardState.step--; renderWizard(); };
-    nav.appendChild(b);
+    left.appendChild(b);
   }
+  if (wizardState.editing) {
+    const c = el("button", "ghost", "Cancel");
+    c.onclick = () => { wizardState.editing = false; renderBoardScreen(); };
+    left.appendChild(c);
+  }
+  nav.appendChild(left);
   const n = el("button", "primary", next);
   n.onclick = onNext;
   nav.appendChild(n);
 }
 
-function numInput(labelText, value, min, max, onchange) {
+function numInput(labelText, value, min, max, onchange, { locked = "" } = {}) {
   const wrap = el("label", "field");
   wrap.appendChild(el("span", null, labelText));
   const inp = el("input");
   inp.type = "number"; inp.value = value; inp.min = min; inp.max = max;
   inp.onchange = () => onchange(Number(inp.value));
+  if (locked) { inp.disabled = true; inp.title = locked; }
   wrap.appendChild(inp);
+  if (locked) wrap.appendChild(el("small", "locknote", locked));
   return wrap;
 }
 
 function stepLeague(body, nav) {
   body.appendChild(el("h2", null, "League shape"));
+  /* Team count is locked once sales exist: sales reference team slots, so
+   * shrinking the league would orphan them. Everything else stays editable. */
+  const salesExist = wizardState.editing && doc
+    && activeSales(doc.journal).length > 0;
   body.appendChild(numInput("Teams", wizardState.teams, 4, 20,
-    (v) => { wizardState.teams = v; }));
+    (v) => { wizardState.teams = v; }, {
+      locked: salesExist
+        ? "Locked while sales exist (reset the board to change it)" : "" }));
   body.appendChild(numInput("Auction budget per team ($)", wizardState.budget,
     50, 1000, (v) => { wizardState.budget = v; }));
   navButtons(nav, { onNext: () => { wizardState.step++; renderWizard(); } });
@@ -186,7 +230,8 @@ function stepScoring(body, nav) {
 function stepTeams(body, nav) {
   body.appendChild(el("h2", null, "Team names"));
   body.appendChild(el("p", "hint",
-    "One per line. Editable any time later. The first one is yours."));
+    "One per line. The first one is yours. Change these any time under " +
+    "the gear menu, League settings."));
   const ta = el("textarea");
   ta.rows = Math.min(wizardState.teams, 14);
   if (!wizardState.teamNames.length) {
@@ -196,15 +241,32 @@ function stepTeams(body, nav) {
   ta.value = wizardState.teamNames.join("\n");
   body.appendChild(ta);
   navButtons(nav, {
-    onNext: () => {
+    onNext: async () => {
       const names = ta.value.split("\n").map((s) => s.trim()).filter(Boolean);
       while (names.length < wizardState.teams) {
         names.push(`Team ${names.length + 1}`);
       }
       wizardState.teamNames = names.slice(0, wizardState.teams);
+      if (wizardState.editing) { await saveLeagueEdit(); return; }
       wizardState.step++; renderWizard();
     },
+    next: wizardState.editing ? "Save settings" : "Next",
   });
+}
+
+/* Edit-mode finish: rewrite doc.league from the wizard, keep everything else
+ * (sources, journal, calls, favorites), and recompute values as a new
+ * append-only run so the values-from chip shows the change. */
+async function saveLeagueEdit() {
+  await finishWizard();
+  wizardState.editing = false;
+  if (Object.keys(doc.sources).length) {
+    await makeRun();
+    doc.ui.run = null;              // newest run becomes current
+    await saveDoc(doc);
+  }
+  renderBoardScreen();
+  stampShow("SAVED", "league settings updated");
 }
 
 function stepData(body, nav) {
@@ -1961,6 +2023,11 @@ async function boot() {
     menu.hidden = true;
     if (!doc || !doc.league) { alert("Finish setup first."); return; }
     openPlanEditor();
+  };
+  $("#menuLeague").onclick = () => {
+    menu.hidden = true;
+    if (!doc || !doc.league) { alert("Finish setup first."); return; }
+    openLeagueEditor();
   };
   let resetArmed = 0;
   const resetBtn = $("#menuReset");

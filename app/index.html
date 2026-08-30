@@ -436,7 +436,8 @@ button:disabled{opacity:.55;cursor:default}
 textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
   border-radius:6px;background:var(--input)}
 .wiznav{display:flex;justify-content:space-between;margin-top:22px}
-.wiznav button:only-child{margin-left:auto}
+.wizleft{display:flex;gap:8px}
+.locknote{font-size:11px;color:var(--faint)}
 .msg{color:var(--bad);font-size:13px;margin-top:10px}
 .tblwrap{overflow-x:auto;margin:12px 0}
 .maptable{border-collapse:collapse;font-size:12px;width:100%}
@@ -640,7 +641,7 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
 <div id="errbar"></div>
 <header>
   <div id="mast">LIQUID SHEETS<small id="spendline">AUCTION DRAFT VALUES</small></div>
-  <span class="ver">V35 (parity)</span>
+  <span class="ver">V36 (parity)</span>
   <div id="hleft"></div>
   <span class="hspace"></span>
   <div id="hcenter"></div>
@@ -653,6 +654,7 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
     <div id="gearmenu" class="gearmenu" hidden>
       <button id="menuTheme" class="gtoggle"><span>Dark mode</span><span class="sw"><span class="knob"></span></span></button>
       <div class="gdiv"></div>
+      <button id="menuLeague">League settings</button>
       <button id="menuPlan">Budget plan</button>
       <button id="menuHelp">Under the hood</button>
       <div class="gdiv"></div>
