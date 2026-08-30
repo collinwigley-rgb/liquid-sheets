@@ -382,6 +382,9 @@ function stepTeams(body, nav) {
   if (w.me >= w.teams) w.me = 0;
 
   const list = el("div", "teamlist");
+  const head = el("div", "trow thead");
+  ["", "Team", "Me", ""].forEach((t) => head.appendChild(el("span", null, t)));
+  list.appendChild(head);
   let dragFrom = null;
   const move = (from, to) => {
     if (to < 0 || to >= w.teams || from === to) return;
@@ -409,7 +412,7 @@ function stepTeams(body, nav) {
     const me = el("label", "melab");
     const r = el("input"); r.type = "radio"; r.name = "meteam"; r.checked = w.me === i;
     r.onchange = () => { w.me = i; renderWizard(); };
-    me.appendChild(r); me.appendChild(el("span", null, "me"));
+    me.appendChild(r); me.title = "this is my team";
     row.appendChild(me);
     const mv = el("span", "mv");
     const up = el("button", "ghost tiny", "\u25b2"); up.type = "button"; up.title = "move up";
@@ -2376,7 +2379,7 @@ async function refreshSaveStatus() {
   const big = $("#gsaved"), sub = $("#gsub"), auto = $("#menuAutosave");
   if (!big) return;
   const file = await linkedFileName();
-  big.textContent = doc && doc.saved_at ? "Saved in this browser" : "Nothing saved yet";
+  big.textContent = doc && doc.saved_at ? "Auto-saved" : "Nothing saved yet";
   const bits = [];
   if (doc && doc.saved_at) bits.push(ago(doc.saved_at));
   bits.push(persisted ? "protected storage" : "browser storage");
@@ -2472,11 +2475,11 @@ async function boot() {
       resetArmed = Date.now();
       resetBtn.textContent = "Click again to CONFIRM reset";
       setTimeout(() => {
-        resetBtn.textContent = "Reset board (clear all sales)"; resetArmed = 0;
+        resetBtn.textContent = "Clear all sales"; resetArmed = 0;
       }, 5000);
       return;
     }
-    resetBtn.textContent = "Reset board (clear all sales)";
+    resetBtn.textContent = "Clear all sales";
     resetArmed = 0; menu.hidden = true;
     const n = activeSales(doc.journal).length;
     doc.journal = [];                 // deliberate draft reset; league is kept

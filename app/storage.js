@@ -217,12 +217,19 @@ async function clearApp() {
   }
 }
 
-export async function exportDoc() {
+/* file name carries the active league's name: liquid-sheets-<league>-<date>.json */
+function backupName(doc) {
+  const raw = doc && doc.league && doc.league.name ? doc.league.name : "";
+  const slug = raw.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return `liquid-sheets-${slug ? slug + "-" : ""}${new Date().toISOString().slice(0, 10)}.json`;
+}
+
+export async function exportDoc(doc) {
   const blob = new Blob([JSON.stringify(await buildBundle(), null, 1)],
     { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `liquid-sheets-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = backupName(doc);
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -299,7 +306,7 @@ export async function unlinkFile() { await put(HANDLE_KEY, null); }
 /* pick: force the picker even if a file is linked. silent: never prompt
  * (used by auto-save); returns {mode:"needs-click"} if permission lapsed. */
 export async function saveToFile(doc, { pick = false, silent = false } = {}) {
-  if (!canSaveToFile) { await exportDoc(); return { mode: "download" }; }
+  if (!canSaveToFile) { await exportDoc(doc); return { mode: "download" }; }
   let h = pick ? null : await get(HANDLE_KEY);
   if (h) {
     const opts = { mode: "readwrite" };
@@ -313,7 +320,7 @@ export async function saveToFile(doc, { pick = false, silent = false } = {}) {
   if (!h) {
     if (silent) return { mode: "none" };
     h = await window.showSaveFilePicker({
-      suggestedName: `liquid-sheets-${new Date().toISOString().slice(0, 10)}.json`,
+      suggestedName: backupName(doc),
       types: [{ description: "Liquid Sheets backup",
         accept: { "application/json": [".json"] } }],
     });
