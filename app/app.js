@@ -383,7 +383,7 @@ function stepTeams(body, nav) {
 
   const list = el("div", "teamlist");
   const head = el("div", "trow thead");
-  ["", "Team", "Me", ""].forEach((t) => head.appendChild(el("span", null, t)));
+  ["", "Team", "Me"].forEach((t) => head.appendChild(el("span", null, t)));
   list.appendChild(head);
   let dragFrom = null;
   const move = (from, to) => {
@@ -414,13 +414,6 @@ function stepTeams(body, nav) {
     r.onchange = () => { w.me = i; renderWizard(); };
     me.appendChild(r); me.title = "this is my team";
     row.appendChild(me);
-    const mv = el("span", "mv");
-    const up = el("button", "ghost tiny", "\u25b2"); up.type = "button"; up.title = "move up";
-    up.onclick = () => move(i, i - 1);
-    const dn = el("button", "ghost tiny", "\u25bc"); dn.type = "button"; dn.title = "move down";
-    dn.onclick = () => move(i, i + 1);
-    mv.appendChild(up); mv.appendChild(dn);
-    row.appendChild(mv);
     list.appendChild(row);
   });
   body.appendChild(list);
@@ -469,8 +462,8 @@ function projectionCards({ afterSleeper, resumeAt }) {
   const cards = el("div", "optcards");
   const msg = el("p", "msg");
   const sleeper = el("button", "optcard primary");
-  const title = "Start with Sleeper's public projections";
-  sleeper.innerHTML = `<b>${title}</b><small>One click, straight from your browser. See the board now; add your own sources any time.</small>`;
+  const title = "Import today's Sleeper public projections";
+  sleeper.innerHTML = `<b>${title}</b><small>See the board now; add more sources later.</small>`;
   sleeper.onclick = async () => {
     sleeper.disabled = true; sleeper.querySelector("b").textContent = "Fetching...";
     try {
@@ -498,10 +491,11 @@ function projectionCards({ afterSleeper, resumeAt }) {
 }
 
 function stepData(body, nav) {
-  body.appendChild(el("h2", null, "Projections (My$)"));
+  body.appendChild(el("h2", null, "Your Projections (My$)"));
   body.appendChild(el("p", "hint",
-    "My$ is built from projections. Start with Sleeper's to see the board " +
-    "now, or bring your own; with more than one source the board blends them."));
+    "Your board is made with your data. Start with Sleeper's Player " +
+    "Projections to see the board now, or bring your own; with more than one " +
+    "source the board averages them."));
   body.appendChild(projectionCards({
     afterSleeper: async () => {
       await finishWizard(); wizardState.step++; renderWizard();
@@ -515,10 +509,8 @@ function stepData(body, nav) {
 function stepMarket(body, nav) {
   body.appendChild(el("h2", null, "Market values (Bid$)"));
   body.appendChild(el("p", "hint",
-    "Optional. Import today's Yahoo or ESPN auction values. They never touch " +
-    "My$: they are rescaled to your league's money as Bid$, the estimate of " +
-    "what your room will pay, and +/- then shows where the deals are. Without " +
-    "them The Call still fires; only Bid$ and +/- stay blank."));
+    "Import today's Yahoo or ESPN auction values. They are rescaled to your " +
+    "league's money as Bid$. Bid$ is the estimate of what your room will pay."));
   const cards = el("div", "optcards");
   const imp = el("button", "optcard primary");
   imp.innerHTML = `<b>Import Yahoo or ESPN values</b><small>Copy the values page or upload the CSV; you confirm the column mapping.</small>`;

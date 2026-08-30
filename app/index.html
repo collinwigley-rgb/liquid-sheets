@@ -106,7 +106,7 @@ header{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;
 /* teams step: reorderable list */
 .teamlist{display:flex;flex-direction:column;gap:4px;max-height:52vh;overflow:auto;
   padding-right:2px}
-.trow{display:grid;grid-template-columns:18px 1fr 34px 62px;gap:8px;align-items:center;
+.trow{display:grid;grid-template-columns:18px 1fr 34px;gap:8px;align-items:center;
   padding:3px 6px 3px 4px;border:1px solid var(--line-soft);border-radius:6px;
   background:var(--raised)}
 .trow.thead{background:transparent;border-color:transparent;padding-top:0;padding-bottom:2px;
@@ -127,8 +127,6 @@ header{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;
   cursor:pointer;white-space:nowrap}
 .melab input{accent-color:var(--gold);margin:0}
 .trow.isme .melab{color:var(--gold);font-weight:700}
-.trow .mv{display:inline-flex;gap:2px}
-.trow .mv button{padding:1px 5px;font-size:8px;line-height:1.4}
 .gver{color:var(--c-muted);font-size:10px;font-family:var(--mono);
   padding:4px 10px 2px;text-align:right}
 .gearwrap{position:relative}
@@ -822,7 +820,7 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
       <div class="gdiv"></div>
       <button id="menuReset" class="gdanger">Clear all sales</button>
       <div class="gdiv"></div>
-      <div class="ver gver">V45 (parity)</div>
+      <div class="ver gver">V46 (parity)</div>
     </div>
   </span>
 </header>
