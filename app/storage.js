@@ -45,15 +45,107 @@ export function migrate(doc) {
   return doc;
 }
 
+/* Listeners run after every successful save (status line, file auto-save). */
+const savedListeners = [];
+export function onSaved(fn) { savedListeners.push(fn); }
+
 export async function saveDoc(doc) {
   doc.saved_at = new Date().toISOString();
   const db = await openDB();
-  return new Promise((res, rej) => {
+  await new Promise((res, rej) => {
     const tx = db.transaction(STORE, "readwrite");
     tx.objectStore(STORE).put(doc, KEY);
     tx.oncomplete = () => res();
     tx.onerror = () => rej(tx.error);
   });
+  for (const fn of savedListeners) { try { fn(doc); } catch (e) { console.warn(e); } }
+}
+
+/* ---- where the data lives, made visible ----
+ * Ask the browser to mark this origin's storage persistent (not evicted under
+ * disk pressure). Returns true/false, or null if the API is missing. */
+export async function requestPersist() {
+  try {
+    if (navigator.storage && navigator.storage.persist) {
+      return await navigator.storage.persist();
+    }
+  } catch (e) { /* ignore */ }
+  return null;
+}
+
+/* Heuristic for a private/incognito window, where storage is discarded on
+ * close. Browsers hand such windows a much smaller quota; there is no direct
+ * API, so this is a best-effort hint, worded as one in the UI. */
+export async function storageLooksTemporary() {
+  try {
+    const est = navigator.storage && navigator.storage.estimate
+      ? await navigator.storage.estimate() : null;
+    if (est && est.quota && est.quota < 250 * 1024 * 1024) return true;
+  } catch (e) { /* ignore */ }
+  return false;
+}
+
+/* ---- save to a file the user owns ----
+ * Chrome/Edge expose the File System Access API: pick a file once, then every
+ * later save writes to the same file silently. The handle is kept in the same
+ * IndexedDB store. Other browsers fall back to a download (exportDoc). */
+const HANDLE_KEY = "filehandle";
+export const canSaveToFile = typeof window !== "undefined"
+  && "showSaveFilePicker" in window;
+
+async function getKey(key) {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const rq = db.transaction(STORE).objectStore(STORE).get(key);
+    rq.onsuccess = () => res(rq.result ?? null);
+    rq.onerror = () => rej(rq.error);
+  });
+}
+async function putKey(key, val) {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE, "readwrite");
+    if (val === null) tx.objectStore(STORE).delete(key);
+    else tx.objectStore(STORE).put(val, key);
+    tx.oncomplete = () => res();
+    tx.onerror = () => rej(tx.error);
+  });
+}
+
+export async function linkedFileName() {
+  const h = await getKey(HANDLE_KEY);
+  return h ? h.name : null;
+}
+
+export async function unlinkFile() { await putKey(HANDLE_KEY, null); }
+
+/* pick: force the picker even if a file is linked. silent: never prompt
+ * (used by auto-save); returns {mode:"needs-click"} if permission lapsed. */
+export async function saveToFile(doc, { pick = false, silent = false } = {}) {
+  if (!canSaveToFile) { exportDoc(doc); return { mode: "download" }; }
+  let h = pick ? null : await getKey(HANDLE_KEY);
+  if (h) {
+    const opts = { mode: "readwrite" };
+    let p = await h.queryPermission(opts);
+    if (p !== "granted") {
+      if (silent) return { mode: "needs-click", name: h.name };
+      p = await h.requestPermission(opts);
+      if (p !== "granted") h = null;
+    }
+  }
+  if (!h) {
+    if (silent) return { mode: "none" };
+    h = await window.showSaveFilePicker({
+      suggestedName: `liquid-sheets-${new Date().toISOString().slice(0, 10)}.json`,
+      types: [{ description: "Liquid Sheets backup",
+        accept: { "application/json": [".json"] } }],
+    });
+    await putKey(HANDLE_KEY, h);
+  }
+  const w = await h.createWritable();
+  await w.write(JSON.stringify(doc, null, 1));
+  await w.close();
+  return { mode: "file", name: h.name };
 }
 
 export async function wipeDoc() {

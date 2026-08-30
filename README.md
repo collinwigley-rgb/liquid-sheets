@@ -1,6 +1,6 @@
 # Liquid Sheets
 
-A free, open, browser-only auction draft tool for fantasy football. All computation runs client-side. You bring your own projections and league settings. It works with no internet connection, because draft-room wifi always dies at the worst moment.
+A free, open, browser-only auction draft tool for fantasy football. All computation runs client-side. You bring your own projections and league settings. Everything is stored in your browser: no account, no server, nothing uploaded. Closing the tab loses nothing; a one-file save moves it to another device. (It also works with no connection, since there is nothing to connect to.)
 
 **Status: in build (feature-parity pass landed 2026-08-25).** The app runs: setup wizard, one-click Sleeper fetch, universal paste/CSV import, a value board, and a full draft room (The Call with plan-fit, budget envelopes, owner ledger, TEAMS grid, room-pressure strip, flagged players, named bets). Developed in the open. Target: public beta by July 2027, launch for the 2027 draft season.
 
@@ -15,7 +15,7 @@ It is derived from a private single-league tool built and battle-tested through 
 1. No data redistribution, ever. Users bring their own.
 2. Client-side everything. No backend, no accounts.
 3. Every number traces to an inspectable calculation.
-4. Offline-first. Airplane mode is the acceptance test.
+4. Your data stays in your browser. Nothing uploaded; a file you own is the way to move or copy it. Working offline follows from that and remains an acceptance test.
 5. Free forever. No monetization.
 
 ## The plan

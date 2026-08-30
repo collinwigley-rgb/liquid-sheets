@@ -9,7 +9,9 @@ import { activeSales, appendSale, appendUnsale, ownerStates,
   inflationFactor, theCall, totalRosterSpots as rosterSpots }
   from "./draft.js";
 import { PRIOR, PRIOR_SEASON } from "./prior_2026.js";
-import { loadDoc, saveDoc, wipeDoc, newDoc, exportDoc, importDocFile }
+import { loadDoc, saveDoc, wipeDoc, newDoc, exportDoc, importDocFile,
+  onSaved, requestPersist, storageLooksTemporary, canSaveToFile,
+  linkedFileName, saveToFile }
   from "./storage.js";
 import { fetchSleeper } from "./sleeper.js";
 import { myPlanState, planFit, defaultPlan } from "./plan.js";
@@ -2005,7 +2007,7 @@ function helpRoom() {
     <div class="hbody"><h4>${title}</h4>${body}${pv ? `<div class="hpv">${pv}</div>` : ""}</div>
   </section>`;
   return `<p class="hlead">The room, in the order you use it. Each element is
-    arithmetic over the My$ pipeline, so all of it works offline.</p>
+    arithmetic over the My$ pipeline; nothing here needs a server.</p>
   <div class="hpipe">
   ${step(1, "The board.",
     `<p>One column per position, sorted by my$. Rule lines are the tier
@@ -2040,9 +2042,15 @@ function helpRoom() {
   ${step(6, "Log the sale.",
     `<p>Price, team, Enter. The ledger tracks every team's money and max bid.
      Double-tap Escape reopens the last sale to fix it.</p>`)}
-  ${step(7, "It keeps working.",
-    `<p>Every action saves to this device. Airplane mode changes nothing.
-     Export a backup from the gear before you sit down.</p>`)}
+  ${step(7, "Where your data lives.",
+    `<p>Every action is saved in this browser, on this device. Closing the tab
+     loses nothing; reopen and the board is exactly as you left it. Nothing is
+     sent anywhere.</p>
+     <p>A file is for moving to another device or browser, or as a copy you
+     own: gear, <b>Save to file</b>. On Chrome and Edge you pick the file once
+     and later saves write to it silently; turn on auto-save to keep it current
+     after every sale. The gear menu always shows when and where you are
+     saved.</p>`)}
   </div>`;
 }
 
@@ -2068,12 +2076,70 @@ function openHelp() {
 
 /* ---------------- boot ---------------- */
 
+/* ---------------- where the data lives ----------------
+ * Every action is already saved to this browser (IndexedDB). These make that
+ * visible in the gear menu, ask the browser to protect the storage, offer a
+ * file the user owns (silent re-save on Chrome/Edge), and warn only in the
+ * one case where closing really does lose data: a private window. */
+let persisted = null, autosaveTimer = null;
+
+function ago(iso) {
+  if (!iso) return "";
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 8) return "just now";
+  if (s < 60) return `${Math.round(s)}s ago`;
+  if (s < 3600) return `${Math.round(s / 60)} min ago`;
+  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+async function refreshSaveStatus() {
+  const big = $("#gsaved"), sub = $("#gsub"), auto = $("#menuAutosave");
+  if (!big) return;
+  const file = await linkedFileName();
+  big.textContent = doc && doc.saved_at ? "Saved in this browser" : "Nothing saved yet";
+  const bits = [];
+  if (doc && doc.saved_at) bits.push(ago(doc.saved_at));
+  bits.push(persisted ? "protected storage" : "browser storage");
+  if (file) bits.push(`file: ${file}${doc?.ui?.autosaveFile ? " (auto)" : ""}`);
+  sub.textContent = bits.join(" \u00b7 ");
+  auto.hidden = !(file && canSaveToFile);
+  auto.classList.toggle("on", !!(doc && doc.ui && doc.ui.autosaveFile));
+}
+
+function autosaveToFile() {
+  if (!doc || !doc.ui || !doc.ui.autosaveFile || !canSaveToFile) return;
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(async () => {
+    try {
+      const r = await saveToFile(doc, { silent: true });
+      if (r.mode === "needs-click") {
+        $("#gsub").textContent = `file needs a click: gear > Save to file`;
+      }
+    } catch (e) { console.warn("file auto-save failed", e); }
+  }, 800);
+}
+
+function showNotice(html) {
+  const n = $("#notice");
+  n.innerHTML = `<span>${html}</span><button class="ghost tiny" id="noticeSave">Save to file</button><button class="ghost tiny" id="noticeX" title="dismiss">&times;</button>`;
+  n.classList.add("show");
+  $("#noticeX").onclick = () => n.classList.remove("show");
+  $("#noticeSave").onclick = () => $("#menuSave").click();
+}
+
 async function boot() {
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(() => {});
   }
   doc = await loadDoc();
   applyTheme();
+  onSaved(() => { refreshSaveStatus(); autosaveToFile(); });
+  requestPersist().then((ok) => { persisted = ok; refreshSaveStatus(); });
+  storageLooksTemporary().then((tmp) => {
+    if (tmp) showNotice("This looks like a private window: the browser may " +
+      "forget everything here when it closes. Keep a file you own.");
+  });
+  refreshSaveStatus();
   const importInput = $("#importfile");
   importInput.onchange = async () => {
     if (!importInput.files.length) return;
@@ -2135,10 +2201,23 @@ async function boot() {
   };
   $("#menuHelp").onclick = () => { menu.hidden = true; openHelp(); };
   $("#menuImport").onclick = () => { menu.hidden = true; importInput.click(); };
-  $("#menuExport").onclick = () => {
+  $("#menuSave").onclick = async () => {
     menu.hidden = true;
-    if (doc) exportDoc(doc);
-    else alert("Nothing to back up yet.");
+    if (!doc) { alert("Nothing to save yet."); return; }
+    try {
+      const r = await saveToFile(doc);
+      if (r.mode === "file") stampShow("SAVED", `to ${r.name}`);
+      else if (r.mode === "download") stampShow("SAVED", "backup downloaded");
+      refreshSaveStatus();
+    } catch (e) {
+      if (e && e.name !== "AbortError") alert(`Save failed: ${e.message}`);
+    }
+  };
+  $("#menuAutosave").onclick = async (ev) => {
+    ev.stopPropagation();
+    if (!doc) return;
+    doc.ui.autosaveFile = !doc.ui.autosaveFile;
+    await saveDoc(doc);          // triggers the status refresh and first auto-save
   };
   $("#menuSleeper").onclick = async () => {
     menu.hidden = true;

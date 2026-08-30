@@ -108,6 +108,15 @@ header{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;
   box-shadow:0 12px 40px rgba(0,0,0,.3);display:flex;flex-direction:column;
   min-width:200px;z-index:40;overflow:hidden;padding:6px}
 .gearmenu[hidden]{display:none}
+.gearmenu button[hidden]{display:none}
+.gearmenu{min-width:236px}
+.gstat{padding:6px 10px 8px;font-size:12.5px;color:var(--c-text)}
+.gstat small{display:block;color:var(--c-muted);font-size:11px;margin-top:2px;
+  line-height:1.4;font-family:var(--mono)}
+#notice{display:none;background:var(--c-chip);border-bottom:1px solid var(--c-gold);
+  color:var(--c-text);font-size:13px;padding:8px 16px;gap:12px;align-items:center}
+#notice.show{display:flex}
+#notice span{flex:1}
 .gearmenu button{border:none;background:none;border-radius:4px;
   text-align:left;padding:8px 10px;font-size:13px;color:var(--c-text)}
 .gearmenu button:hover{background:var(--c-bg)}
@@ -689,6 +698,7 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
 </head>
 <body>
 <div id="errbar"></div>
+<div id="notice"></div>
 <header>
   <div id="mast">
     <svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#12171e"/><polygon points="14,22 32,32 32,52 14,42" fill="#3f8fa3"/><polygon points="32,32 50,22 50,42 32,52" fill="#63b2c6"/><polygon points="32,12 50,22 32,32 14,22" fill="#a8dbe6"/><polygon points="10,31 32,43 54,31 32,19" fill="#eaf7fa" fill-opacity=".82" stroke="#63b2c6" stroke-width="1.2"/><polygon points="32,12 50,22 50,42 32,52 14,42 14,22" fill="none" stroke="#d6f0f5" stroke-width="1.4" stroke-linejoin="round"/></svg>
@@ -704,6 +714,11 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
     </button>
     <div id="gearmenu" class="gearmenu" hidden>
+      <div class="gstat"><b id="gsaved">Saved in this browser</b><small id="gsub"></small></div>
+      <button id="menuSave">Save to file</button>
+      <button id="menuAutosave" class="gtoggle" hidden><span>Auto-save to file</span><span class="sw"><span class="knob"></span></span></button>
+      <button id="menuImport">Import backup</button>
+      <div class="gdiv"></div>
       <button id="menuTheme" class="gtoggle"><span>Dark mode</span><span class="sw"><span class="knob"></span></span></button>
       <div class="gdiv"></div>
       <button id="menuLeague">League settings</button>
@@ -711,12 +726,10 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
       <button id="menuHelp">Under the hood</button>
       <div class="gdiv"></div>
       <button id="menuSleeper">Import Sleeper values</button>
-      <button id="menuExport">Export backup</button>
-      <button id="menuImport">Import backup</button>
       <div class="gdiv"></div>
       <button id="menuReset" class="gdanger">Reset board (clear all sales)</button>
       <div class="gdiv"></div>
-      <div class="ver gver">V38 (parity)</div>
+      <div class="ver gver">V39 (parity)</div>
     </div>
   </span>
 </header>

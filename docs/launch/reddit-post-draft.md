@@ -18,8 +18,8 @@ Notes before posting:
 
 **Title options (pick one):**
 
-1. I built a free, offline auction draft sheet that runs entirely in your browser. Here is how it works.
-2. Open-source auction draft tool: bring your own projections, it does the math, works with no wifi
+1. I built a free auction draft tool that runs entirely in your browser (no account, nothing uploaded). Here is how it works.
+2. Open-source auction draft tool: bring your own projections, it does the math, everything stays in your browser
 3. A BeerSheets-style auction board that can't get killed by data licensing (because it never hosts any data)
 
 ---
@@ -32,7 +32,7 @@ Link: `<URL>` (nothing to install, no account, no cost)
 
 **What it is, in one paragraph**
 
-You give it your league settings and your own projections. It turns them into auction dollar values scaled to your exact budget and roster, then runs the whole draft: a live board, a verdict on every player nominated, a budget plan that adjusts as you spend, and a ledger of what every team has left. All of it is math in your browser. If the draft-room wifi dies, it keeps working.
+You give it your league settings and your own projections. It turns them into auction dollar values scaled to your exact budget and roster, then runs the whole draft: a live board, a verdict on every player nominated, a budget plan that adjusts as you spend, and a ledger of what every team has left. All of it is math in your browser; nothing is uploaded anywhere.
 
 **How the values are built (the whole model, four steps)**
 
@@ -64,7 +64,7 @@ Auction drafts move fast, so data entry was designed to get out of the way:
 - Projections are one click (Sleeper) or paste-anything: it detects the format, guesses the column mapping, and you confirm two dropdowns. When a site changes its export next August, you fix a dropdown instead of waiting on an app update.
 - Logging a sale is: nominated player is already staged, type the price, pick the team, Enter. Undo is a double-tap of Escape.
 - Keyboard everywhere: search-and-Enter to stage, arrow keys across the team grid, no mouse required mid-draft.
-- Everything saves on every action to your browser. Close the tab, reopen, you are exactly where you were. There is also a one-file export/import as a backup.
+- Everything saves on every action to your browser. Close the tab, reopen, you are exactly where you were. "Save to file" gives you a copy you own (on Chrome/Edge it re-saves to the same file silently), and that file is how you move to another device.
 
 **What it deliberately does not do**
 
