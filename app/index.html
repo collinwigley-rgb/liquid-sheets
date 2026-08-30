@@ -625,6 +625,49 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
 .hpv .cmax,.hpv .cest{font-size:12.5px;color:var(--muted)}
 .hpv .cmax b,.hpv .cest b{color:var(--text)}
 .hpv .fcell{margin:2px 6px 2px 0}
+.hvp.fair{background:var(--gold)}
+.hlist{margin:0 0 7px;padding-left:18px;font-size:13px;line-height:1.55;color:var(--muted)}
+.hlist b{color:var(--text)}
+.hgear{display:inline-block;font-size:13px;color:var(--text);padding:0 4px;
+  border:1px solid var(--line);border-radius:3px;line-height:1.3}
+.hsub{margin:-8px 0 14px 39px;position:relative}
+.hsub::before{content:"";position:absolute;left:-27px;top:9px;width:14px;height:1px;
+  background:var(--line)}
+.hsub p{margin:0 0 6px;font-size:13px;color:var(--muted)}
+.hsub p b{color:var(--text)}
+.hlab{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);
+  margin-right:10px}
+.hprice{display:flex;align-items:center}
+.hpin{display:inline-block;width:72px;padding:5px 8px;border:1px solid var(--gold);
+  border-radius:6px;background:var(--input);color:var(--text);font-family:var(--mono);
+  font-size:15px;font-weight:700;text-align:right}
+.hown{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.hown .obtn{display:inline-block;width:auto;padding:4px 10px;border:1px solid var(--line);
+  border-radius:6px;background:var(--surface);font-size:13px;color:var(--text)}
+.hown .obtn.selected{border-color:var(--focus);border-width:2px;background:var(--sel)}
+.hsumm{font-size:13px;color:var(--muted);margin-bottom:8px}
+.hsumm b{color:var(--text)}
+.hsumm .g{color:var(--gold);font-family:var(--mono);font-weight:700}
+.hdraft{display:block;text-align:center;background:var(--gold);color:#fdf9ee;
+  font-family:var(--disp);letter-spacing:.2em;font-weight:700;padding:9px;
+  border-radius:6px;font-size:13px}
+.hmc b{font-size:10px;letter-spacing:.16em;color:var(--faint)}
+.hmc .callset{display:flex;align-items:center;gap:8px;margin:6px 0}
+.hmc .cval{display:inline-flex;align-items:center;gap:2px;padding:4px 10px;
+  border:1px solid var(--line);border-radius:6px;background:var(--input);
+  font-family:var(--mono);font-size:15px;font-weight:700;color:var(--text)}
+.hmc .callbtns{display:flex;gap:8px;margin-top:6px}
+.hmc .callbtns .ghost{flex:1}
+.hmc .callbtns .primary{flex:2}
+.htog{width:100%;justify-content:space-between;font-size:13px;color:var(--text)}
+.hnote2{display:block;margin-top:6px;font-size:11.5px;color:var(--faint)}
+.hh{margin:6px 0 12px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--faint);border-top:1px solid var(--line-soft);padding-top:14px}
+.hnote{margin:0 0 16px}
+.hnote h4{margin:0 0 5px;font-size:14px;color:var(--text)}
+.hnote p{margin:0 0 7px;font-size:13px;line-height:1.55;color:var(--muted)}
+.hnote p b{color:var(--text)}
+.hnote .mdot{margin:0 2px;vertical-align:middle}
 
 /* ---------- gear divider + live read ---------- */
 .gdiv{height:1px;background:var(--c-line);margin:6px 4px}
@@ -729,7 +772,7 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
       <div class="gdiv"></div>
       <button id="menuReset" class="gdanger">Reset board (clear all sales)</button>
       <div class="gdiv"></div>
-      <div class="ver gver">V39 (parity)</div>
+      <div class="ver gver">V40 (parity)</div>
     </div>
   </span>
 </header>

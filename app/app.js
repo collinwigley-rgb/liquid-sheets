@@ -360,7 +360,8 @@ async function makeRun() {
     players = s.players;
     label = sourceNames[0];
   }
-  const result = valueBoard(cfg, players, PRIOR);
+  const result = valueBoard(cfg, players,
+    doc.ui.availFade === false ? [] : PRIOR);   // fade toggle: empty prior = no fade
   doc.runs.push({
     run_id: doc.runs.length + 1,
     created_at: new Date().toISOString(),
@@ -962,9 +963,9 @@ function skillCol(pos) {
   col.innerHTML =
     `<div class="colhead"><div class="t1"><span class="${posClass(pos)}" title="Position column. Values are computed against replacement baseline ${pos}${base}: the best player assumed freely available.">${pos}</span><button class="colbtn" title="collapse this column to a slim strip">&#171;</button></div>
      <div class="t2 grid-skill"><span title="tier: players whose values sit within noise of each other. A tier ends once value has fallen 20% below that tier's own top - one rule that catches both hard cliffs and slow slides. The horizontal rule marks each break.">T</span><span>player</span>
-       <span class="pts" title="estimated bid the room pays: your market source's average salary, rescaled to your league's money supply. Blank until you add market values.">bid$</span>
+       <span class="pts" title="estimated bid the room pays: your market source's average salary, rescaled to your league's money supply. Blank until you add market values.">Bid$</span>
        <span class="edge sortable${sortBy === "deal" ? " on" : ""}" data-sort="deal" title="my$ minus bid$. GREEN (+) a deal: worth more to me than the room pays. RED (-) the room pays past my value. Blank without market values. CLICK to sort by deal.">+/-</span>
-       <span class="r sortable${sortBy === "usd" ? " on" : ""}" data-sort="usd" title="my auction value for this league: the most you should be willing to pay. CLICK to sort by value.">my$</span></div></div>`;
+       <span class="r sortable${sortBy === "usd" ? " on" : ""}" data-sort="usd" title="my auction value for this league: the most you should be willing to pay. CLICK to sort by value.">My$</span></div></div>`;
   col.querySelector(".colbtn").onclick = (e) => {
     e.stopPropagation(); toggleCol(pos);
   };
@@ -1021,7 +1022,7 @@ function kdefCol() {
        <span class="kd pDEF${kdefView === "DEF" ? " on" : ""}" data-kd="DEF" title="show defenses">DEF</span>
        <small title="the model prices every K and DEF at $1">$1 rule</small>
        <button class="colbtn" title="collapse this column to a slim strip">&#171;</button></div>
-     <div class="t2 grid-kdef"><span>player</span><span class="r" title="market average salary, when you have pasted values">mkt$</span></div></div>`;
+     <div class="t2 grid-kdef"><span>player</span><span class="r" title="market average salary, when you have pasted values">Mkt$</span></div></div>`;
   col.querySelector(".colbtn").onclick = (e) => {
     e.stopPropagation(); toggleCol("KDEF");
   };
@@ -1405,7 +1406,7 @@ function renderCall(p) {
       : "");
   $("#call").style.display = "block";
   $("#call").innerHTML = `<span class="cverdict ${a.cls}">${a.label}</span>
-    <div class="cmax" title="the break-even ceiling from my value model - past this you provably overpaid.">worth <b>$${a.max}</b>${a.max !== a.worth ? ` <span>(value $${a.worth}, plan-capped)</span>` : ""}</div>
+    <div class="cmax" title="the break-even ceiling from my value model - past this you provably overpaid.">worth <b>$${a.max}</b></div>
     ${a.est ? `<div class="cest">room bids <b>~$${a.est}</b></div>` : ""}
     ${slotRows}
     <ul>${a.reasons.slice(0, 5).map((r) => `<li>${r}</li>`).join("")}</ul>`;
@@ -1930,11 +1931,18 @@ document.addEventListener("keydown", (e) => {
 $("#ovl").onclick = (e) => { if (e.target.id === "ovl") closeModal(); };
 
 /* ---------------- under the hood ----------------
- * Two tabs. "What is My$?" is the value pipeline, one step per computation,
- * stated plainly with the source and the formula so a wary reader can decide
- * whether they agree. "The Weapon" is the draft room in the order you use it,
- * each element shown as a live preview built from the room's own styles, with
- * one line on which My$ step it draws from. Examples use the user's league. */
+ * Two tabs. "How To" is the room in the order you use it, each element shown
+ * as a preview built from the room's own styles. "What is My$?" is the value
+ * pipeline, one layer per computation, stated plainly with the source and the
+ * formula so a wary reader can decide whether they agree. Examples use the
+ * user's league. */
+
+const hstep = (n, title, body, pv) => `<section class="hstep">
+    <span class="hn">${n}</span>
+    <div class="hbody"><h4>${title}</h4>${body}${pv ? `<div class="hpv">${pv}</div>` : ""}</div>
+  </section>`;
+const hsub = (body, pv) => `<div class="hsub"><p>${body}</p><div class="hpv">${pv}</div></div>`;
+const GEAR = `<span class="hgear" aria-label="gear">&#9881;</span>`;
 
 function helpValue() {
   const L = doc.league;
@@ -1942,135 +1950,164 @@ function helpValue() {
   const spots = L.model_params.dollar_slots_per_team;
   const pool = B * T - spots * T;
   const base = baselines(L);
-  const rbStart = L.roster_slots.RB;
-  const step = (n, title, body, pv) => `<section class="hstep">
-    <span class="hn">${n}</span>
-    <div class="hbody"><h4>${title}</h4>${body}${pv ? `<div class="hpv">${pv}</div>` : ""}</div>
-  </section>`;
+  const fade = doc.ui.availFade !== false;
   return `<p class="hlead">My$ is the most you should pay for a player in this league. It is built
-    from data you brought, in five steps you can check.</p>
+    from data you brought, with the following layers on top.</p>
   <div class="hpipe">
-  ${step(1, "Your projections set the baseline.",
+  ${hstep(1, "Your projections set the baseline.",
     `<p>One click pulls Sleeper's public projections; paste or import more
      (FantasyPros, CBS, any rankings list). With more than one source the board
      averages them into a <b>blend</b>.</p>
-     <p>Yahoo and ESPN <i>dollar values</i> are not projections and never enter
-     the blend. Import them as <b>Market values</b>: they show as <b>mkt$</b>,
-     get rescaled to your room's money as <b>bid$</b>, and <b>+/-</b> is
-     my$ minus bid$. Where your baseline differs from what the room pays is
-     the deal, or the overpay.</p>`,
-    `<div class="hrow hhead"><span>player</span><span>bid$</span><span>+/-</span><span>my$</span></div>
+     <p><b>What is Bid$?</b> Yahoo or ESPN values get imported as <b>Mkt$</b> and
+     rescaled as <b>Bid$</b> according to your league's budget and roster.
+     <b>+/-</b> shows where you might get a deal.</p>`,
+    `<div class="hrow hhead"><span>player</span><span>Bid$</span><span>+/-</span><span>My$</span></div>
      <div class="hrow"><span>J. Gibbs <small>DET</small></span><span>$54</span><span class="up">+7</span><span class="usd">$61</span></div>
      <div class="hrow"><span>C. Lamb <small>DAL</small></span><span>$48</span><span class="dn">-6</span><span class="usd">$42</span></div>`)}
-  ${step(2, "Your scoring turns stats into points.",
-    `<p>Every projected stat line is scored with the rules you entered in setup:
-     yards, touchdowns, receptions, turnovers. Change a rule and every My$ moves
-     with it, because points are the input to everything below.</p>`)}
-  ${step(3, "Availability discount.",
+  ${hstep(2, "Your league's scoring settings (the BeerSheets layer).",
+    `<p>A player's projected points are calculated from his projected stats
+     using your league's scoring settings, so My$ is specific to this league
+     and moves when a rule changes.</p>`)}
+  ${hstep(3, "Availability fade.",
     `<p><b>Source:</b> nflverse injury and games data crossed with
      FantasyFootballCalculator ADP, seasons 2015 to 2025, aggregated to expected
-     games missed per position and draft slot. It is by <i>slot</i>, not by
-     player: no one's medical history is in it. The table ships in the app
+     games missed per position (RB) and draft slot (RB6). It is by slot, not by
+     player; no one's medical history is in it. The table ships in the app
      (<code>app/prior_2026.js</code>).</p>
-     <p><b>Formula:</b> points x (17 - expected missed) / 17. The RB1 slot expects
-     4.4 games missed, the QB1 slot 1.8, so top RBs are discounted about 26%
-     and top QBs about 11%.</p>`)}
-  ${step(4, "Points above a free player.",
+     <p><b>Formula:</b> points x (17 - expected missed) / 17. The RB1 slot
+     expects 4.4 games missed, the QB1 slot 1.8, so top RBs are faded about 26%
+     and top QBs about 11%.</p>`,
+    `<button class="gtoggle htog ${fade ? "on" : ""}" id="availtog"><span>Apply the availability fade</span><span class="sw"><span class="knob"></span></span></button>
+     <small class="hnote2">${fade ? "On: values include the fade." : "Off: raw projected points, no fade."} Flipping it recomputes the board as a new run.</small>`)}
+  ${hstep(4, "Points above a free player.",
     `<p>At each position the baseline is the player who will still be free on
      waivers when the draft ends: the number your league starts there (flex
      counted by share) plus 15% for bench. In this league that is the
-     <b>${base.RB}th RB</b> (${T} teams x ${rbStart} starters, plus flex and
-     bench share), the ${base.WR}th WR, the ${base.QB}th QB, the ${base.TE}th TE.</p>
-     <p>A player's value is his points <b>above</b> that baseline player. Points
-     the free player would also score are worth $0. Tiers mark value cliffs
-     (a tier ends when the next value falls 20%).</p>`)}
-  ${step(5, "Points become dollars.",
+     <b>${base.RB}th RB</b>, the ${base.WR}th WR, the ${base.QB}th QB, the
+     ${base.TE}th TE.</p>
+     <p>A player's value is his points <b>above</b> that baseline player; points
+     the free player would also score are worth $0. This drops the undraftable
+     tail out of the money and concentrates the budget on the players who will
+     actually be bought. It also makes positions comparable: a QB and an RB are
+     both measured against their own replacement. Tiers mark value cliffs (a
+     tier ends when the next value falls 20%).</p>`)}
+  ${hstep(5, "Points become dollars.",
     `<p>Your room holds ${T} x $${B} = <b>$${(T * B).toLocaleString()}</b>. Every
      roster spot costs at least $1, so $${(spots * T).toLocaleString()} is
      reserved for minimum bids and <b>$${pool.toLocaleString()}</b> is the
      pool that buys value.</p>
      <p><b>My$ = $1 + (his value above baseline / everyone's value above
      baseline) x pool.</b> The values sum back to exactly your room's money:
-     if one player is priced high, someone else is priced low. K and DEF are
-     $1 by design.</p>`)}
-  ${step("+", "My Calls.",
-    `<p>Your own dollar override on a player, set from the research popup when
-     you disagree with the model. Calls live in a separate <b>blend + My
-     Calls</b> run, so the base numbers are never touched; switch between the
-     two in the <i>values from</i> chip.</p>`)}
+     if one player is priced high, someone else is priced low.</p>`)}
+  ${hstep("+", "My Calls.",
+    `<p>Your own dollar override on a player, for when you have a hunch. Open
+     his research popup and nudge the number. Calls live in a separate
+     <b>blend + My Calls</b> run, so the base numbers are never touched; switch
+     between the two in the <i>values from</i> chip.</p>`,
+    `<div class="hmc"><b>MY CALL</b>
+     <div class="callset"><button class="cstep">-</button><div class="cval"><span class="cd">$</span><span class="hcv">61</span></div><button class="cstep">+</button></div>
+     <div class="callbtns"><button class="ghost">Reset to 58</button><button class="primary">Set to 61</button></div></div>`)}
   </div>`;
 }
 
 function helpRoom() {
-  const step = (n, title, body, pv) => `<section class="hstep">
-    <span class="hn">${n}</span>
-    <div class="hbody"><h4>${title}</h4>${body}${pv ? `<div class="hpv">${pv}</div>` : ""}</div>
-  </section>`;
-  return `<p class="hlead">The room, in the order you use it. Each element is
-    arithmetic over the My$ pipeline; nothing here needs a server.</p>
+  return `<p class="hlead">How to use this tool as your draft weapon.</p>
   <div class="hpipe">
-  ${step(1, "The board.",
-    `<p>One column per position, sorted by my$. Rule lines are the tier
-     cliffs (step 4). Sold players fade; yours are marked.</p>`,
-    `<div class="hrow hhead"><span>RB</span><span>bid$</span><span>+/-</span><span>my$</span></div>
+  ${hstep(1, "The board.",
+    `<ul class="hlist">
+     <li><b>My$</b>: your projected value (see <i>What is My$?</i>)</li>
+     <li><b>Bid$</b>: what your league is likely to bid</li>
+     <li><b>+/-</b>: the difference between the two</li></ul>`,
+    `<div class="hrow hhead"><span class="pRB">RB</span><span>Bid$</span><span>+/-</span><span>My$</span></div>
      <div class="hrow"><span><i class="ht">1</i> B. Robinson</span><span>$58</span><span class="up">+3</span><span class="usd">$61</span></div>
      <div class="hrow htier"><span><i class="ht">2</i> J. Jacobs</span><span>$41</span><span class="dn">-4</span><span class="usd">$37</span></div>`)}
-  ${step(2, "Stage the nominated player.",
-    `<p>Double-click his row, or type his name and press Enter.</p>`,
-    `<div class="hsearch"><span class="hq">gib</span><span class="hhit">Jahmyr Gibbs <small>DET RB</small> <kbd>Enter</kbd></span></div>`)}
-  ${step(3, "The Call.",
-    `<p>Fires instantly: the verdict, <b>worth</b> (his my$, capped by the plan
-     envelope for the slots he could fill), and <b>room bids</b> (his bid$ from
-     your market values).</p>`,
-    `<div class="hcall"><span class="hvp">TARGET</span>
-     <div class="cmax">worth <b>$58</b> <span>(value $61, plan-capped)</span></div>
-     <div class="cest">room bids <b>~$54</b></div></div>`)}
-  ${step(4, "Your plan.",
-    `<p>Target envelopes per starting slot, set under <i>Budget plan</i>. As you
-     spend they water-fill to your remaining money: bank a deal and the others
-     grow, overpay and they shrink, each capped at the best my$ still on the
-     board for that slot. A reserve is held for bench, K and DEF.</p>`,
-    `<div class="cslots"><div class="srow"><span class="lab">RB1</span><span class="pl">~$58</span></div>
-     <div class="srow"><span class="lab">FLEX</span><span class="pl">~$19</span></div></div>`)}
-  ${step(5, "The pressure strip.",
-    `<p>Per position after every sale: starter slots still needed league-wide
-     vs startable players left. Amber, the window is closing; red, crunch. A
-     triangle marks a run (4 of the last 6 sales).</p>`,
-    `<span class="fcell">QB <b>9/14</b></span>
-     <span class="fcell tight">RB <b>11/8</b></span>
-     <span class="fcell crunch">TE <b>6/2</b> <i class="runmark">&#9650;</i></span>`)}
-  ${step(6, "Log the sale.",
-    `<p>Price, team, Enter. The ledger tracks every team's money and max bid.
-     Double-tap Escape reopens the last sale to fix it.</p>`)}
-  ${step(7, "Where your data lives.",
-    `<p>Every action is saved in this browser, on this device. Closing the tab
-     loses nothing; reopen and the board is exactly as you left it. Nothing is
-     sent anywhere.</p>
-     <p>A file is for moving to another device or browser, or as a copy you
-     own: gear, <b>Save to file</b>. On Chrome and Edge you pick the file once
-     and later saves write to it silently; turn on auto-save to keep it current
-     after every sale. The gear menu always shows when and where you are
-     saved.</p>`)}
-  </div>`;
+  ${hstep(2, "Stage the nominated player.",
+    `<p>Just start typing his name, no need to click anywhere. Press Enter. You
+     can also double-click his name on the board.</p>`,
+    `<div class="hsearch"><span class="hq">/love</span><span class="hhit">Jeremiyah Love <b class="pRB">RB</b> <small>ARI</small> <kbd>Enter</kbd></span></div>`)}
+  ${hstep(3, "The Call.",
+    `<p>Fires instantly with a verdict:</p>
+     <ul class="hlist">
+     <li><b>TARGET</b>: the room is likely to pay $2 or more under My$.</li>
+     <li><b>FAIR VALUE</b>: Bid$ and My$ are within a couple of dollars.</li>
+     <li><b>LAST CHANCE</b>: two or fewer comparable players left at his position, with funded owners still chasing them.</li>
+     <li><b>LET HIM GO</b>: the room is likely to pay $4 or more over My$.</li></ul>
+     <p>Derived from My$, Bid$, and what is still on the board.</p>`,
+    `<div class="hcall"><span class="hvp fair">FAIR VALUE</span>
+     <div class="cmax">worth <b>$29</b></div>
+     <div class="cslots"><div class="srow"><span class="lab pRB">RB</span><span class="pl pRB">~$28</span></div>
+     <div class="srow"><span class="lab pFLX">FLX</span><span class="pl pFLX">~$25</span></div></div></div>`)}
+  ${hstep(4, "Your Budget Plan.",
+    `<p>Target spend per starting slot, set under ${GEAR} <i>Budget plan</i>. As
+     you spend, they water-fill to your remaining money: bank a deal and the
+     others grow, overpay and they shrink. Each target also re-calcs as players
+     come off the board, so it can never be higher than the most expensive
+     player still available at that position.</p>`,
+    `<div class="cslots"><div class="srow"><span class="lab pRB">RB1</span><span class="pl pRB">~$58</span></div>
+     <div class="srow"><span class="lab pWR">WR1</span><span class="pl pWR">~$44</span></div>
+     <div class="srow"><span class="lab pFLX">FLEX</span><span class="pl pFLX">~$19</span></div></div>`)}
+  ${hstep(5, "Log the sale.",
+    ``,
+    null)}
+  ${hsub("Type the price. Enter.",
+    `<div class="hprice"><span class="hlab">price</span><span class="hpin">34</span></div>`)}
+  ${hsub("Select the winning team. Enter.",
+    `<div class="hown"><span class="hlab">owner</span><span class="obtn">Team 1</span><span class="obtn">Team 2</span><span class="obtn selected">Team 3</span></div>`)}
+  ${hsub("Enter logs the sale. Double-tap Escape reopens the last sale to fix it.",
+    `<div class="hsumm"><b>Jeremiyah Love</b> to <b>Team 3</b> for <span class="g">$34</span></div><span class="hdraft">DRAFT</span>`)}
+  </div>
+  <h4 class="hh">Also on screen</h4>
+  <section class="hnote">
+    <h4>The pressure strip.</h4>
+    <p>Shows position scarcity as the draft plays out. <b>QB 12/10</b> means 12
+     starting QB slots are still open across the league and only 10 players
+     worth $5 or more are left at QB. That is a crunch: someone goes without.
+     Amber, the window is closing; red, crunch. A triangle marks a run (4 of the
+     last 6 sales at that position).</p>
+    <p>Dots: <i class="mdot exposed"></i> red, you still need this position and
+     it is tightening. <i class="mdot exploit"></i> green, you are already set
+     here, so nominate it and make the room spend where you do not need to.</p>
+    <div class="hpv"><span class="fcell">QB <b>9/14</b></span>
+     <span class="fcell tight">RB <b>11/8</b> <i class="mdot exposed"></i></span>
+     <span class="fcell crunch">TE <b>6/2</b> <i class="mdot exploit"></i> <i class="runmark">&#9650;</i></span></div>
+  </section>
+  <section class="hnote">
+    <h4>It keeps working.</h4>
+    <p>Every action saves to this device automatically. You can safely close
+     your browser window without losing data.</p>
+  </section>`;
 }
 
-function openHelp() {
+function openHelp(tab = "r") {
   const m = $("#modal");
   m.classList.add("wide");
   m.innerHTML = `<h3>Under the hood</h3>
     <div id="mtabs">
-      <button class="mtab on" data-m="v">What is My$?</button>
-      <button class="mtab" data-m="r">The Weapon</button>
+      <button class="mtab ${tab === "r" ? "on" : ""}" data-m="r">How To</button>
+      <button class="mtab ${tab === "v" ? "on" : ""}" data-m="v">What is My$?</button>
     </div>
-    <div id="mtabc">${helpValue()}</div>`;
+    <div id="mtabc">${tab === "r" ? helpRoom() : helpValue()}</div>`;
+  const wire = () => {
+    const t = $("#availtog");
+    if (t) t.onclick = async () => {
+      doc.ui.availFade = doc.ui.availFade === false;   // flip
+      await saveDoc(doc);
+      if (Object.keys(doc.sources).length) {
+        await makeRun(); doc.ui.run = null; await saveDoc(doc);
+        renderBoardScreen();
+      }
+      $("#mtabc").innerHTML = helpValue(); wire();
+    };
+  };
   document.querySelectorAll(".mtab").forEach((b) => {
     b.onclick = () => {
       document.querySelectorAll(".mtab").forEach((x) =>
         x.classList.toggle("on", x === b));
       $("#mtabc").innerHTML = b.dataset.m === "v" ? helpValue() : helpRoom();
-      m.scrollTop = 0;
+      m.scrollTop = 0; wire();
     };
   });
+  wire();
   $("#ovl").style.display = "flex";
 }
 

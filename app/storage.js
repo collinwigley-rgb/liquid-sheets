@@ -41,6 +41,7 @@ export function migrate(doc) {
   else if (!doc.ui.theme) doc.ui.theme = "dark";
   if (!("run" in doc.ui)) doc.ui.run = null;        // selected run id
   if (!doc.ui.planVariant) doc.ui.planVariant = "default";
+  if (!("availFade" in doc.ui)) doc.ui.availFade = true;   // availability fade on
   doc.schema_version = SCHEMA_VERSION;
   return doc;
 }
@@ -171,7 +172,7 @@ export function newDoc() {
     calls: [],             // My Calls: [{pid, delta}]; empty
     favorites: [],         // favorited player ids
     ui: { theme: "dark", themeChosen: false, run: null,
-      planVariant: "default" },
+      planVariant: "default", availFade: true },
   };
 }
 
