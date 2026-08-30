@@ -2,7 +2,7 @@
 
 A free, open, browser-only auction draft tool for fantasy football. All computation runs client-side. You bring your own projections and league settings. Everything is stored in your browser: no account, no server, nothing uploaded. Closing the tab loses nothing; a one-file save moves it to another device. (It also works with no connection, since there is nothing to connect to.)
 
-**Status: live.** Public at https://liquid-sheets.pages.dev/ since 2026-08-30. The app runs: a setup wizard, one-click Sleeper projections, universal paste/CSV import, market values (Yahoo/ESPN) as a separate Bid$ layer, a value board, and a full draft room (The Call, budget envelopes, owner ledger, TEAMS grid, room-pressure strip, Favorites, My Calls), across multiple leagues. Developed in the open.
+**Status: live.** Public at https://sheets.liquidworkflows.com/ since 2026-08-30. The app runs: a setup wizard, one-click Sleeper projections, universal paste/CSV import, market values (Yahoo/ESPN) as a separate Bid$ layer, a value board, and a full draft room (The Call, budget envelopes, owner ledger, TEAMS grid, room-pressure strip, Favorites, My Calls), across multiple leagues. Developed in the open.
 
 ## Why
 

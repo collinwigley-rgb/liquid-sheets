@@ -1,7 +1,7 @@
 # Reddit post - DRAFT (not posted)
 
 Status: draft for Levi's review. Not posted anywhere. Framed for a live launch
-(the app is public at https://liquid-sheets.pages.dev/).
+(the app is public at https://sheets.liquidworkflows.com/).
 
 ## How to think about this draft
 
@@ -24,7 +24,7 @@ Posting notes:
 - Post as an image/gallery post (or a text post with the images inline). Reddit
   rewards a strong first image.
 - Swap the link for your final URL (the custom subdomain once it is wired, else
-  https://liquid-sheets.pages.dev/).
+  https://sheets.liquidworkflows.com/).
 - r/fantasyfootball is strict on tool self-promo (often needs mod approval or the
   weekly tools thread). r/FFCommish and r/DynastyFF are friendlier to open-source
   tools. Read the current rules of whichever sub before posting.
@@ -36,11 +36,13 @@ Posting notes:
 
 1. I'm a data engineer who got tired of BeerSheets, so I spent a month building my own auction draft tool. It's free, no login, and it never leaves your browser.
 2. I built the auction draft tool I always wished BeerSheets was. Free, private, runs entirely in your browser.
-3. Reverse-engineered my own auction values and built a draft-day tool around them. Free, open source, no account, nothing uploaded.
+3. I'm a data engineer that reverse-engineered beersheets etc, and built my dream draft-day weapon. It wasn't for you, it's for me. But it's amazing so I want to share. went ahead and made a public version. you should check it out. Auction draft only for now. Free, open source, no account, nothing uploaded.
 
 ## TL;DR (put this line at the very top of the body)
 
-**Free auction-draft tool. No login, runs entirely in your browser (nothing uploaded, nothing saved on a server). Bring your own projections, it does the draft-day math. Link at the bottom.**
+It does the calculations no human could do in the seconds after a player is nominated so you can actually use those insights to make a decision.
+
+Bring your own data. No login, runs entirely in your browser (nothing uploaded, nothing saved on a server). Bring your own projections, it does the draft-day math. Link at the bottom.**
 
 ## Body
 
@@ -66,7 +68,7 @@ A few things that mattered to me, since I did not want to build another account 
 
 I built it for myself, so it is auction-only and a little opinionated. If you auction draft, take it into a mock and tell me where it is wrong or where it slowed you down. That feedback is the only thing I want out of this.
 
-Link: <URL>
+Link: https://sheets.liquidworkflows.com/
 
 ---
 
@@ -84,4 +86,4 @@ The values are built from projections you bring, re-scored under your league's r
 
 No login, no cloud, nothing uploaded. It runs entirely in your browser and it is open source. Auction-only, built for myself, sharing it in case it helps you too. Tell me where it breaks.
 
-Link: <URL>
+Link: https://sheets.liquidworkflows.com/
