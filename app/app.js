@@ -60,7 +60,7 @@ const wizardState = {
   roster: { QB: 1, RB: 2, WR: 3, TE: 1, FLEX: 1, K: 1, DEF: 1, BN: 5 },
   preset: "half",
   knobs: { ...DEFAULT_KNOBS },
-  teamNames: [],
+  teamNames: [], teamOrig: [], me: 0,
 };
 
 /* Platform selection was removed from the wizard (V3): it had no effect at
@@ -73,6 +73,7 @@ function resetWizardState() {
     step: 0, editing: false, name: "", teams: 12, budget: 200,
     roster: { QB: 1, RB: 2, WR: 3, TE: 1, FLEX: 1, K: 1, DEF: 1, BN: 5 },
     preset: "half", knobs: { ...DEFAULT_KNOBS }, teamNames: [],
+    teamOrig: [], me: 0,
   });
 }
 
@@ -167,6 +168,8 @@ function openLeagueEditor() {
   w.teams = L.teams; w.budget = L.budget;
   w.roster = { ...L.full_roster };
   w.teamNames = [...L.team_names];
+  w.teamOrig = L.team_names.map((_, i) => i);   // original line of each row
+  w.me = L.me ?? 0;
   const ppr = L.scoring.rec.ppr_by_pos.RB;
   w.preset = Object.keys(PRESETS).find((k) => PRESETS[k] === ppr) ?? "half";
   w.knobs = {
@@ -346,31 +349,70 @@ function stepScoring(body, nav) {
   navButtons(nav, { onNext: () => { wizardState.step++; renderWizard(); } });
 }
 
+/* Teams: a reorderable list (drag, or the arrows on touch) with a "me"
+ * marker. Order can change any time, even mid-draft, because each row
+ * remembers its original line (teamOrig) and saveLeagueEdit remaps the sale
+ * journal by that permutation. So the list can be put into the platform's
+ * draft order the moment it is revealed. */
 function stepTeams(body, nav) {
-  body.appendChild(el("h2", null, "Team names"));
+  const w = wizardState;
+  body.appendChild(el("h2", null, "Teams"));
   body.appendChild(el("p", "hint",
-    "One per line; line 1 is you. Order does not matter otherwise, and names " +
-    "can change any time under the gear menu, League settings. Once sales are " +
-    "logged, keep the lines in the same order: each sale is tied to its line."));
-  const ta = el("textarea");
-  ta.rows = Math.min(wizardState.teams, 14);
-  if (!wizardState.teamNames.length) {
-    wizardState.teamNames = Array.from({ length: wizardState.teams },
-      (_, i) => `Team ${i + 1}`);
+    "Name the teams and mark which one is you. Drag to reorder, any time, even " +
+    "mid-draft, to match your platform's order once it is revealed."));
+  while (w.teamNames.length < w.teams) {
+    w.teamNames.push(`Team ${w.teamNames.length + 1}`); w.teamOrig.push(null);
   }
-  ta.value = wizardState.teamNames.join("\n");
-  body.appendChild(ta);
+  w.teamNames.length = w.teams; w.teamOrig.length = w.teams;
+  if (w.me >= w.teams) w.me = 0;
+
+  const list = el("div", "teamlist");
+  let dragFrom = null;
+  const move = (from, to) => {
+    if (to < 0 || to >= w.teams || from === to) return;
+    const [n] = w.teamNames.splice(from, 1); w.teamNames.splice(to, 0, n);
+    const [o] = w.teamOrig.splice(from, 1); w.teamOrig.splice(to, 0, o);
+    if (w.me === from) w.me = to;
+    else if (from < w.me && to >= w.me) w.me--;
+    else if (from > w.me && to <= w.me) w.me++;
+    renderWizard();
+  };
+  w.teamNames.forEach((name, i) => {
+    const row = el("div", `trow${w.me === i ? " isme" : ""}`);
+    row.draggable = true;
+    row.ondragstart = (e) => { dragFrom = i; row.classList.add("drag"); e.dataTransfer.effectAllowed = "move"; };
+    row.ondragend = () => row.classList.remove("drag");
+    row.ondragover = (e) => { e.preventDefault(); row.classList.add("over"); };
+    row.ondragleave = () => row.classList.remove("over");
+    row.ondrop = (e) => { e.preventDefault(); if (dragFrom != null) move(dragFrom, i); dragFrom = null; };
+    const grip = el("span", "grip", "::"); grip.title = "drag to reorder";
+    row.appendChild(grip);
+    const inp = el("input"); inp.type = "text"; inp.value = name; inp.maxLength = 30;
+    inp.oninput = () => { w.teamNames[i] = inp.value; };
+    inp.onkeydown = (e) => { if (e.key === "Enter") e.preventDefault(); };
+    row.appendChild(inp);
+    const me = el("label", "melab");
+    const r = el("input"); r.type = "radio"; r.name = "meteam"; r.checked = w.me === i;
+    r.onchange = () => { w.me = i; renderWizard(); };
+    me.appendChild(r); me.appendChild(el("span", null, "me"));
+    row.appendChild(me);
+    const mv = el("span", "mv");
+    const up = el("button", "ghost tiny", "\u25b2"); up.type = "button"; up.title = "move up";
+    up.onclick = () => move(i, i - 1);
+    const dn = el("button", "ghost tiny", "\u25bc"); dn.type = "button"; dn.title = "move down";
+    dn.onclick = () => move(i, i + 1);
+    mv.appendChild(up); mv.appendChild(dn);
+    row.appendChild(mv);
+    list.appendChild(row);
+  });
+  body.appendChild(list);
   navButtons(nav, {
     onNext: async () => {
-      const names = ta.value.split("\n").map((s) => s.trim()).filter(Boolean);
-      while (names.length < wizardState.teams) {
-        names.push(`Team ${names.length + 1}`);
-      }
-      wizardState.teamNames = names.slice(0, wizardState.teams);
-      if (wizardState.editing) { await saveLeagueEdit(); return; }
-      wizardState.step++; renderWizard();
+      w.teamNames = w.teamNames.map((s, i) => s.trim() || `Team ${i + 1}`);
+      if (w.editing) { await saveLeagueEdit(); return; }
+      w.step++; renderWizard();
     },
-    next: wizardState.editing ? "Save settings" : "Next",
+    next: w.editing ? "Save settings" : "Next",
   });
 }
 
@@ -378,7 +420,20 @@ function stepTeams(body, nav) {
  * (sources, journal, calls, favorites), and recompute values as a new
  * append-only run so the values-from chip shows the change. */
 async function saveLeagueEdit() {
+  /* Reorder is a permutation: each row knows its original line, so every
+   * sale's owner index is rewritten to the row's new position. Lossless. */
+  const w = wizardState;
+  const newIndexOfOrig = new Map();
+  w.teamOrig.forEach((orig, i) => { if (orig != null) newIndexOfOrig.set(orig, i); });
+  let moved = false;
+  for (const e of doc.journal) {
+    if (e.type === "sale" && newIndexOfOrig.has(e.owner)) {
+      const ni = newIndexOfOrig.get(e.owner);
+      if (ni !== e.owner) { e.owner = ni; moved = true; }
+    }
+  }
   await finishWizard();
+  if (moved) stampShow("REORDERED", "sales follow their teams");
   wizardState.editing = false;
   if (Object.keys(doc.sources).length) {
     await makeRun();
@@ -450,6 +505,7 @@ async function finishWizard() {
       dollar_slots_per_team: totalRosterSpots(w.roster),
     },
     team_names: [...w.teamNames],
+    me: w.me ?? 0,
   };
   await saveDoc(doc);
 }
@@ -823,8 +879,9 @@ function applyTheme() {
   if (t === "light") delete document.documentElement.dataset.theme;
   else document.documentElement.dataset.theme = "dark";
 }
+const ME = () => doc.league.me ?? 0;   // which line is "you" (reorderable)
 const owners = () => doc.league.team_names.map((name, i) =>
-  ({ id: i, name, is_me: i === 0 }));
+  ({ id: i, name, is_me: i === ME() }));
 const short = (o) => o.is_me ? "ME"
   : o.name.split(" ")[0].slice(0, 4).toUpperCase();
 
@@ -936,7 +993,7 @@ const dealOf = (p) => (doc.market && p.usd != null && p.y_avg != null)
 /* ledger states in the original's field names */
 function oStates() {
   return ownerStates(doc.league, curSales).map((o) => ({
-    id: o.idx, name: o.name, is_me: o.idx === 0, spent: o.spent,
+    id: o.idx, name: o.name, is_me: o.idx === ME(), spent: o.spent,
     left: o.remaining, open: o.spotsLeft, max: o.maxBid }));
 }
 
@@ -1336,8 +1393,8 @@ function renderFlow() {
     const cls = demand > supply ? " crunch" : margin <= 2 ? " tight" : "";
     const run = runPos.has(pos)
       ? `<i class="runmark" title="${pos} run: 4+ of the last 6 sales">&#9650;</i>` : "";
-    const iNeed = needs[0][pos] > 0
-      || (["RB", "WR", "TE"].includes(pos) && needs[0].FLX > 0);
+    const iNeed = needs[ME()][pos] > 0
+      || (["RB", "WR", "TE"].includes(pos) && needs[ME()].FLX > 0);
     const dot = cls ? `<i class="mdot ${iNeed ? "exposed" : "exploit"}"></i>` : "";
     const stance = !cls ? ""
       : iNeed ? " YOU STILL NEED THIS SLOT: act before the music stops; do not nominate your own target."
@@ -1489,16 +1546,16 @@ function advise(p) {
     const cliffPressure = comparable != null && comparable <= 2 && contest >= 2
       && (drop == null || drop >= 8);
     if (deal != null && deal <= -4 && !cliffPressure) {
-      cls = "pass"; label = "LET HIM GO"; max = Math.min(val, envMax);
+      cls = "pass"; label = "LET HIM GO"; max = val;
     } else if (cliffPressure) {
       cls = "last"; label = "LAST CHANCE"; max = val;
       reasons.push(`only ${comparable} comparable ${p.pos}s left`
         + (drop != null ? ` before a $${drop} drop` : "")
         + ` and ${contest} funded owners still need one; paying full value is correct here`);
     } else if (deal != null && deal >= 2) {
-      cls = "target"; label = "TARGET"; max = Math.min(val, envMax);
+      cls = "target"; label = "TARGET"; max = val;
     } else {
-      cls = "value"; label = "FAIR VALUE"; max = Math.min(val, envMax);
+      cls = "value"; label = "FAIR VALUE"; max = val;
     }
     if (comparable != null && !cliffPressure) {
       reasons.push(`${comparable} comparable ${p.pos}s left, `

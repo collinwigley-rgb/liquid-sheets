@@ -100,6 +100,27 @@ header{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;
   outline:none}
 #leaguesel option{color:var(--text);background:var(--surface)}
 .delwrap{margin-top:18px;padding-top:12px;border-top:1px solid var(--line-soft)}
+/* teams step: reorderable list */
+.teamlist{display:flex;flex-direction:column;gap:4px;max-height:52vh;overflow:auto;
+  padding-right:2px}
+.trow{display:grid;grid-template-columns:18px 1fr auto auto;gap:8px;align-items:center;
+  padding:3px 6px 3px 4px;border:1px solid var(--line-soft);border-radius:6px;
+  background:var(--raised)}
+.trow.isme{border-color:var(--gold-dim)}
+.trow.drag{opacity:.4}
+.trow.over{border-color:var(--gold);box-shadow:inset 0 2px 0 var(--gold)}
+.trow .grip{color:var(--faint);cursor:grab;font-family:var(--mono);font-size:12px;
+  text-align:center;user-select:none}
+.trow input[type=text]{font:inherit;padding:4px 8px;border:1px solid transparent;
+  border-radius:4px;background:transparent;color:var(--text);width:100%}
+.trow input[type=text]:hover{border-color:var(--line)}
+.trow input[type=text]:focus{border-color:var(--gold);background:var(--input);outline:none}
+.melab{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);
+  cursor:pointer;white-space:nowrap}
+.melab input{accent-color:var(--gold);margin:0}
+.trow.isme .melab{color:var(--gold);font-weight:700}
+.trow .mv{display:inline-flex;gap:2px}
+.trow .mv button{padding:1px 5px;font-size:8px;line-height:1.4}
 .gver{color:var(--c-muted);font-size:10px;font-family:var(--mono);
   padding:4px 10px 2px;text-align:right}
 .gearwrap{position:relative}
@@ -247,7 +268,7 @@ header{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;
 
 /* staged pulse (ported) */
 .row.staged{border-left-color:var(--gold);
-  animation:bidglow .8s ease-in-out infinite}
+  animation:bidglow 1.1s ease-in-out infinite}
 @keyframes bidglow{
   0%,100%{box-shadow:inset 0 0 0 1px var(--gold-dim)}
   50%{box-shadow:inset 0 0 0 2px var(--gold),0 0 20px rgba(217,166,72,.65)}}
@@ -793,7 +814,7 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
       <div class="gdiv"></div>
       <button id="menuReset" class="gdanger">Reset board (clear all sales)</button>
       <div class="gdiv"></div>
-      <div class="ver gver">V42 (parity)</div>
+      <div class="ver gver">V43 (parity)</div>
     </div>
   </span>
 </header>
