@@ -563,12 +563,59 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
 #mfav{font-size:22px;line-height:1;color:var(--faint);padding:0 2px}
 #mfav:hover{color:var(--pos-def)}
 #mfav.on{color:var(--pos-def)}
-#mtabs{display:flex;gap:6px;margin:2px 0 12px}
-.mtab{font-size:11px;font-weight:700;letter-spacing:.14em;color:var(--faint);
-  padding:5px 12px;border:1px solid var(--line);border-radius:4px;
-  text-transform:uppercase}
-.mtab.on{color:var(--text);border-color:var(--gold-dim);
-  background:var(--picked-bg)}
+/* under the hood: segmented tabs, a numbered pipeline, live element previews */
+#modal.wide{width:540px;padding:22px 26px}
+#mtabs{display:flex;margin:8px 0 16px;border:1px solid var(--line);
+  border-radius:6px;padding:3px;background:var(--surface)}
+.mtab{flex:1;font-size:12.5px;font-weight:700;letter-spacing:.02em;
+  color:var(--muted);padding:7px 10px;border:none;border-radius:4px;
+  background:transparent}
+.mtab.on{color:var(--text);background:var(--raised);
+  box-shadow:0 1px 0 var(--line-soft)}
+.hlead{font-size:14px;line-height:1.55;color:var(--text);margin:0 0 18px}
+.hpipe{position:relative}
+.hpipe::before{content:"";position:absolute;left:12px;top:16px;bottom:16px;
+  width:1px;background:var(--line)}
+.hstep{display:flex;gap:14px;margin:0 0 18px;position:relative}
+.hn{flex:none;width:25px;height:25px;border-radius:50%;background:var(--ground);
+  border:1px solid var(--gold);color:var(--gold);font-family:var(--mono);
+  font-size:11px;font-weight:700;display:inline-flex;align-items:center;
+  justify-content:center;margin-top:1px;position:relative;z-index:1}
+.hbody{min-width:0;flex:1}
+.hbody h4{margin:4px 0 5px;font-size:14px;color:var(--text)}
+.hbody p{margin:0 0 7px;font-size:13px;line-height:1.55;color:var(--muted)}
+.hbody p b{color:var(--text)}
+.hbody code{font-family:var(--mono);font-size:11.5px;background:var(--surface);
+  padding:1px 4px;border-radius:3px}
+.hpv{margin-top:8px;padding:8px 10px;background:var(--surface);
+  border:1px solid var(--line-soft);border-radius:6px;font-size:12.5px}
+.hrow{display:grid;grid-template-columns:1fr 46px 40px 46px;gap:6px;
+  align-items:center;padding:3px 2px;font-family:var(--mono);font-size:12.5px;
+  color:var(--text)}
+.hrow span:nth-child(n+2){text-align:right}
+.hrow small{color:var(--faint);font-size:10.5px;margin-left:3px}
+.hrow.hhead{color:var(--faint);font-size:10px;letter-spacing:.14em;
+  text-transform:uppercase;border-bottom:1px solid var(--line-soft);
+  margin-bottom:2px}
+.hrow .up{color:var(--good);font-weight:700}
+.hrow .dn{color:var(--bad)}
+.hrow .usd{font-weight:700;font-size:13.5px}
+.hrow.htier{border-top:1px dashed var(--gold-dim);margin-top:3px;padding-top:5px}
+.ht{font-style:normal;color:var(--faint);font-size:10px;margin-right:4px}
+.hsearch{display:flex;gap:10px;align-items:center;font-size:12.5px;flex-wrap:wrap}
+.hq{font-family:var(--mono);padding:3px 8px;border:1px solid var(--line);
+  border-radius:4px;background:var(--input);color:var(--text)}
+.hhit{color:var(--text)}
+.hhit small{color:var(--faint)}
+.hhit kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
+  border-radius:3px;padding:0 4px;color:var(--muted);margin-left:4px}
+.hcall{display:flex;flex-direction:column;gap:4px}
+.hvp{align-self:flex-start;font-family:var(--disp);font-size:12px;
+  letter-spacing:.14em;padding:3px 10px;border-radius:4px;background:var(--good);
+  color:#fdf9ee;font-weight:700}
+.hpv .cmax,.hpv .cest{font-size:12.5px;color:var(--muted)}
+.hpv .cmax b,.hpv .cest b{color:var(--text)}
+.hpv .fcell{margin:2px 6px 2px 0}
 
 /* ---------- gear divider + live read ---------- */
 .gdiv{height:1px;background:var(--c-line);margin:6px 4px}
@@ -669,7 +716,7 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
       <div class="gdiv"></div>
       <button id="menuReset" class="gdanger">Reset board (clear all sales)</button>
       <div class="gdiv"></div>
-      <div class="ver gver">V37 (parity)</div>
+      <div class="ver gver">V38 (parity)</div>
     </div>
   </span>
 </header>

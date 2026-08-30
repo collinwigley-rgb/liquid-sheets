@@ -110,18 +110,28 @@ Deleting:
 - if it was the last, creates a fresh blank doc and opens the wizard. This is
   the "start over as a first-time user" path that is missing today.
 
-## Export / import
+## Projection sources are shared (decided 2026-08-30)
 
-- **Export backup** exports the ACTIVE league (today's behavior, file name
-  gains the league name). Users who want everything use **Export all leagues**
-  (new, writes `{bundle: true, leagues: [docs...]}`).
-- **Import backup**:
-  - a single-league file (any schema <= current) imports as a NEW league and
-    switches to it; it never overwrites the active league silently. If a
-    league with the same `id` exists, it gets a fresh id.
-  - a bundle imports every league the same way.
-  This is a behavior change from today (import replaced the one doc) and is
-  the safer default once there are several.
+Levi's question: does per-league mean re-importing the same dataset for every
+league? Yes it would, so: **sources are stored once, app-wide**, in a `sources`
+key next to `meta`. Every league blends from the same pool under its own
+scoring, roster and budget, which is exactly what makes the numbers differ per
+league. Import a source once, all leagues see it. `doc.sources` on each league
+doc goes away (migration moves the first league's sources to the shared key);
+`makeRun()` reads the shared pool. Market values (Yahoo/ESPN dollars) stay
+per-league, since they are that league's platform.
+
+## Backup export / import (decided 2026-08-30)
+
+"Import" here means the JSON backup from gear > Export backup, nothing else;
+projections and market values have their own import paths and never create a
+league. The only way to add a league is the masthead dropdown's "Add new",
+which runs the setup wizard (name first).
+
+- **Export backup** writes the whole app: meta, shared sources, every league.
+  One file, same ritual as today.
+- **Import backup** replaces the whole app with that file, same as today. No
+  per-league merge semantics; keep it simple.
 
 ## Things that do NOT change
 
@@ -145,11 +155,17 @@ Deleting:
 5. Export all / import-as-new.
 6. Gauntlet: two new checks. Bump masthead + SW cache. Ship.
 
-## Open questions for Levi
+## Also queued from the same review
 
-1. Should projection sources be shared across leagues? They are raw stats, so
-   in principle yes, but "as of" dates and the player pool differ by fetch.
-   Recommendation: per-league (simplest, matches "a league is a doc"); the
-   one-click Sleeper fetch makes re-pulling cheap.
-2. Import semantics: confirm "import always creates a new league" is what you
-   want, versus an option to overwrite the active one.
+Levi (2026-08-30): Yahoo/ESPN dollar values should be set up as a clear
+"League values" step, probably in the wizard, rather than found later under
+the import menu. The app already keeps them separate from the blend
+(`doc.market`, shown as mkt$ / bid$ / +/-); this is a placement change, not a
+model change. Candidate: a sixth wizard step after Data, skippable, with the
+same paste/CSV mapper.
+
+## Open questions
+
+None outstanding; both earlier questions were answered 2026-08-30 (sources
+shared app-wide; backup import replaces the whole app; leagues are added only
+through the wizard).
