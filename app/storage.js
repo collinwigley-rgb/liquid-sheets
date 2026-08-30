@@ -91,10 +91,11 @@ function strip(doc) {
   delete rec.sources; delete rec.names; delete rec.player_meta;
   return rec;
 }
-function attach(doc, shared, meta) {
+/* Theme is remembered per league (Levi, 2026-08-30): the doc keeps its own
+ * ui.theme; meta.theme only seeds a brand-new league with the last choice. */
+function attach(doc, shared) {
   doc.sources = shared.sources; doc.names = shared.names;
   doc.player_meta = shared.player_meta;
-  doc.ui.theme = meta.theme; doc.ui.themeChosen = meta.themeChosen;
   return doc;
 }
 
@@ -126,7 +127,7 @@ export async function loadDoc() {
   if (m.active == null) return null;
   const rec = await get(lkey(m.active));
   if (!rec) return null;
-  return attach(migrate(rec), await loadShared(), m);
+  return attach(migrate(rec), await loadShared());
 }
 
 /* Listeners run after every successful save (status line, file auto-save). */

@@ -214,8 +214,7 @@ function renderWizard() {
     box.appendChild(el("p", "wizintro", wizardState.editing
       ? "Editing league settings. Your sources, sales, calls and favorites " +
         "are kept; values are recomputed when you save."
-      : "Five quick steps to a board built for your league. Defaults are " +
-        "filled in; change only what differs from your league."));
+      : "Build the board for your league."));
   }
   const body = el("div", "wizbody");
   box.appendChild(body);
@@ -304,9 +303,7 @@ function stepLeague(body, nav) {
 
 function stepRoster(body, nav) {
   body.appendChild(el("h2", null, "Roster"));
-  body.appendChild(el("p", "hint",
-    "Starting slots per position, one FLEX pool (RB/WR/TE), bench size. " +
-    "Kickers and defenses are priced at $1 by design."));
+  body.appendChild(el("p", "hint", "Roster size."));
   const grid = el("div", "grid4");
   for (const slot of ["QB", "RB", "WR", "TE", "FLEX", "K", "DEF", "BN"]) {
     grid.appendChild(numInput(slot, wizardState.roster[slot], 0, 12,
@@ -352,8 +349,9 @@ function stepScoring(body, nav) {
 function stepTeams(body, nav) {
   body.appendChild(el("h2", null, "Team names"));
   body.appendChild(el("p", "hint",
-    "One per line. The first one is yours. Change these any time under " +
-    "the gear menu, League settings."));
+    "One per line; line 1 is you. Order does not matter otherwise, and names " +
+    "can change any time under the gear menu, League settings. Once sales are " +
+    "logged, keep the lines in the same order: each sale is tied to its line."));
   const ta = el("textarea");
   ta.rows = Math.min(wizardState.teams, 14);
   if (!wizardState.teamNames.length) {
@@ -392,14 +390,24 @@ async function saveLeagueEdit() {
 }
 
 function stepData(body, nav) {
-  body.appendChild(el("h2", null, "Projections"));
+  body.appendChild(el("h2", null, "Your projections"));
   body.appendChild(el("p", "hint",
-    "One click fetches projections from Sleeper's public data, straight " +
-    "from your browser. You can add more sources later."));
-  const btn = el("button", "primary big", "Fetch projections");
+    "The board is built from projections you bring: FantasyPros, CBS, a " +
+    "spreadsheet, any rankings list. Import them now, or see the board first " +
+    "with Sleeper's public projections and add your own any time."));
+  const cards = el("div", "optcards");
+  const mine = el("button", "optcard primary");
+  mine.innerHTML = `<b>Import my projections</b><small>Paste or upload a CSV; you confirm the column mapping.</small>`;
+  mine.onclick = async () => {
+    await finishWizard();
+    importState = { kind: "projections" };
+    renderImport();
+  };
+  const sleeper = el("button", "optcard");
+  sleeper.innerHTML = `<b>Start with Sleeper's public projections</b><small>One click, straight from your browser, so you can see the board now.</small>`;
   const msg = el("p", "msg");
-  btn.onclick = async () => {
-    btn.disabled = true; btn.textContent = "Fetching...";
+  sleeper.onclick = async () => {
+    sleeper.disabled = true; sleeper.querySelector("b").textContent = "Fetching...";
     try {
       await finishWizard();
       await doFetchSleeper();
@@ -407,10 +415,12 @@ function stepData(body, nav) {
     } catch (e) {
       msg.textContent = `Fetch failed (${e.message}). If you are offline, ` +
         "reconnect and try again; the wizard settings are saved.";
-      btn.disabled = false; btn.textContent = "Fetch projections";
+      sleeper.disabled = false;
+      sleeper.querySelector("b").textContent = "Start with Sleeper's public projections";
     }
   };
-  body.appendChild(btn);
+  cards.appendChild(mine); cards.appendChild(sleeper);
+  body.appendChild(cards);
   body.appendChild(msg);
   navButtons(nav, {
     next: "Skip for now",
@@ -2052,7 +2062,7 @@ const hstep = (n, title, body, pv) => `<section class="hstep">
     <span class="hn">${n}</span>
     <div class="hbody"><h4>${title}</h4>${body}${pv ? `<div class="hpv">${pv}</div>` : ""}</div>
   </section>`;
-const hsub = (body, pv) => `<div class="hsub"><p>${body}</p><div class="hpv">${pv}</div></div>`;
+const hsub = (body, pv) => `<div class="hsub"><div class="hpv"><p class="hcap">${body}</p>${pv}</div></div>`;
 const GEAR = `<span class="hgear" aria-label="gear">&#9881;</span>`;
 
 function helpValue() {
@@ -2111,10 +2121,9 @@ function helpValue() {
      baseline) x pool.</b> The values sum back to exactly your room's money:
      if one player is priced high, someone else is priced low.</p>`)}
   ${hstep("+", "My Calls.",
-    `<p>Your own dollar override on a player, for when you have a hunch. Open
-     his research popup and nudge the number. Calls live in a separate
-     <b>blend + My Calls</b> run, so the base numbers are never touched; switch
-     between the two in the <i>values from</i> chip.</p>`,
+    `<p>Your own dollar override on a player, for when you have a hunch. Adjust
+     by single clicking on the player. Calls live in a separate <b>blend + My
+     Calls</b> run, so the base numbers are never touched.</p>`,
     `<div class="hmc"><b>MY CALL</b>
      <div class="callset"><button class="cstep">-</button><div class="cval"><span class="cd">$</span><span class="hcv">61</span></div><button class="cstep">+</button></div>
      <div class="callbtns"><button class="ghost">Reset to 58</button><button class="primary">Set to 61</button></div></div>`)}
@@ -2128,7 +2137,7 @@ function helpRoom() {
     `<ul class="hlist">
      <li><b>My$</b>: your projected value (see <i>What is My$?</i>)</li>
      <li><b>Bid$</b>: what your league is likely to bid</li>
-     <li><b>+/-</b>: the difference between the two</li></ul>`,
+     <li><b>+/-</b>: the difference between the two. Green = a deal</li></ul>`,
     `<div class="hrow hhead"><span class="pRB">RB</span><span>Bid$</span><span>+/-</span><span>My$</span></div>
      <div class="hrow"><span><i class="ht">1</i> B. Robinson</span><span>$58</span><span class="up">+3</span><span class="usd">$61</span></div>
      <div class="hrow htier"><span><i class="ht">2</i> J. Jacobs</span><span>$41</span><span class="dn">-4</span><span class="usd">$37</span></div>`)}
@@ -2142,10 +2151,10 @@ function helpRoom() {
      <li><b>TARGET</b>: the room is likely to pay $2 or more under My$.</li>
      <li><b>FAIR VALUE</b>: Bid$ and My$ are within a couple of dollars.</li>
      <li><b>LAST CHANCE</b>: two or fewer comparable players left at his position, with funded owners still chasing them.</li>
-     <li><b>LET HIM GO</b>: the room is likely to pay $4 or more over My$.</li></ul>
-     <p>Derived from My$, Bid$, and what is still on the board.</p>`,
+     <li><b>LET HIM GO</b>: the room is likely to pay $4 or more over My$.</li></ul>`,
     `<div class="hcall"><span class="hvp fair">FAIR VALUE</span>
      <div class="cmax">worth <b>$29</b></div>
+     <div class="cest">room bids <b>~$27</b></div>
      <div class="cslots"><div class="srow"><span class="lab pRB">RB</span><span class="pl pRB">~$28</span></div>
      <div class="srow"><span class="lab pFLX">FLX</span><span class="pl pFLX">~$25</span></div></div></div>`)}
   ${hstep(4, "Your Budget Plan.",
@@ -2170,6 +2179,9 @@ function helpRoom() {
   <h4 class="hh">Also on screen</h4>
   <section class="hnote">
     <h4>The pressure strip.</h4>
+    <div class="hpv"><span class="fcell">QB <b>9/14</b></span>
+     <span class="fcell tight">RB <b>11/8</b> <i class="mdot exposed"></i></span>
+     <span class="fcell crunch">TE <b>6/2</b> <i class="mdot exploit"></i> <i class="runmark">&#9650;</i></span></div>
     <p>Shows position scarcity as the draft plays out. <b>QB 12/10</b> means 12
      starting QB slots are still open across the league and only 10 players
      worth $5 or more are left at QB. That is a crunch: someone goes without.
@@ -2178,9 +2190,6 @@ function helpRoom() {
     <p>Dots: <i class="mdot exposed"></i> red, you still need this position and
      it is tightening. <i class="mdot exploit"></i> green, you are already set
      here, so nominate it and make the room spend where you do not need to.</p>
-    <div class="hpv"><span class="fcell">QB <b>9/14</b></span>
-     <span class="fcell tight">RB <b>11/8</b> <i class="mdot exposed"></i></span>
-     <span class="fcell crunch">TE <b>6/2</b> <i class="mdot exploit"></i> <i class="runmark">&#9650;</i></span></div>
   </section>
   <section class="hnote">
     <h4>It keeps working.</h4>

@@ -247,10 +247,10 @@ header{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;
 
 /* staged pulse (ported) */
 .row.staged{border-left-color:var(--gold);
-  animation:bidglow 2.4s ease-in-out infinite}
+  animation:bidglow .8s ease-in-out infinite}
 @keyframes bidglow{
   0%,100%{box-shadow:inset 0 0 0 1px var(--gold-dim)}
-  50%{box-shadow:inset 0 0 0 2px var(--gold),0 0 14px rgba(217,166,72,.4)}}
+  50%{box-shadow:inset 0 0 0 2px var(--gold),0 0 20px rgba(217,166,72,.65)}}
 @media (prefers-reduced-motion:reduce){
   .row.staged{animation:none;box-shadow:inset 0 0 0 2px var(--gold)}}
 
@@ -403,8 +403,8 @@ header{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;
 .bigpanel.wide{max-width:980px}
 .bigpanel h2{margin-bottom:10px;font-size:18px}
 .bigpanel textarea{margin:10px 0}
-.wizard{max-width:560px;margin:6vh auto;background:var(--surface);
-  border:1px solid var(--line);border-radius:10px;padding:26px}
+.wizard{width:100%;max-width:600px;margin:6vh auto;background:var(--surface);
+  border:1px solid var(--line);border-radius:10px;padding:28px 30px}
 .stepper{margin-bottom:18px}
 .stepmeta{display:flex;justify-content:space-between;align-items:baseline;
   font-size:12px;color:var(--muted);margin-bottom:8px}
@@ -421,8 +421,19 @@ header{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;
 .step.on{color:var(--text);font-weight:600}
 .wizintro{color:var(--muted);font-size:13px;margin:0 0 18px;padding-bottom:16px;
   border-bottom:1px solid var(--line-soft)}
-.wizbody h2{margin-bottom:10px;font-size:18px}
-.hint{color:var(--muted);font-size:13px;margin-bottom:16px}
+.wizbody h2{margin:0 0 6px;font-size:20px;letter-spacing:-.01em}
+.hint{color:var(--muted);font-size:13px;line-height:1.5;margin:0 0 16px;max-width:48ch}
+/* data step: two option cards, the user's own data first */
+.optcards{display:grid;gap:10px;margin:14px 0 6px}
+.optcard{display:block;text-align:left;padding:14px 16px;border:1px solid var(--line);
+  border-radius:8px;background:var(--raised);color:var(--text);font:inherit;
+  cursor:pointer;transition:border-color .12s}
+.optcard b{display:block;font-size:15px}
+.optcard small{display:block;color:var(--muted);margin-top:3px;font-size:12.5px;
+  line-height:1.4}
+.optcard.primary{border-color:var(--gold);background:var(--surface)}
+.optcard:hover:not(:disabled){border-color:var(--gold-hi)}
+.optcard:disabled{opacity:.6;cursor:default}
 .choices{display:flex;gap:10px;margin:14px 0;flex-wrap:wrap;
   align-items:center}
 .choice{border:1px solid var(--line);border-radius:6px;padding:7px 14px;
@@ -638,11 +649,13 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
 .hlist b{color:var(--text)}
 .hgear{display:inline-block;font-size:13px;color:var(--text);padding:0 4px;
   border:1px solid var(--line);border-radius:3px;line-height:1.3}
-.hsub{margin:-8px 0 14px 39px;position:relative}
-.hsub::before{content:"";position:absolute;left:-27px;top:9px;width:14px;height:1px;
+.hsub{margin:-8px 0 12px 39px;position:relative}
+.hsub::before{content:"";position:absolute;left:-27px;top:18px;width:14px;height:1px;
   background:var(--line)}
-.hsub p{margin:0 0 6px;font-size:13px;color:var(--muted)}
-.hsub p b{color:var(--text)}
+.hsub .hpv{margin-top:0}
+.hcap{margin:0 0 9px;font-size:13px;color:var(--text);font-weight:600}
+/* previews are display only: no hover, no cursor (the fade toggle is real) */
+.hpv button:not(#availtog),.hpv .obtn,.hpv .hdraft{pointer-events:none}
 .hlab{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);
   margin-right:10px}
 .hprice{display:flex;align-items:center}
@@ -780,7 +793,7 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
       <div class="gdiv"></div>
       <button id="menuReset" class="gdanger">Reset board (clear all sales)</button>
       <div class="gdiv"></div>
-      <div class="ver gver">V41 (parity)</div>
+      <div class="ver gver">V42 (parity)</div>
     </div>
   </span>
 </header>
