@@ -402,26 +402,30 @@ function stepTeams(body, nav) {
      * synthesized from a touch gesture on phones, so the grip uses pointer
      * events and elementFromPoint to find the drop target. */
     const grip = el("span", "grip", "::"); grip.title = "drag to reorder";
-    grip.style.touchAction = "none";
+    grip.style.touchAction = "none";   // stop the browser from scrolling the list mid-drag
     grip.onpointerdown = (e) => {
       e.preventDefault();
+      /* Capture the pointer to the grip so every move/up fires here even once
+       * the finger (or cursor) leaves the handle. Works for mouse and touch;
+       * touch-action:none above keeps a touch-drag from turning into a scroll. */
+      try { grip.setPointerCapture(e.pointerId); } catch (_) { /* ok */ }
       dragFrom = i; row.classList.add("drag");
       let overIdx = null;
-      const onMove = (ev) => {
+      grip.onpointermove = (ev) => {
         const hit = document.elementFromPoint(ev.clientX, ev.clientY);
         const tr = hit && hit.closest(".trow:not(.thead)");
         list.querySelectorAll(".trow.over").forEach((n) => n.classList.remove("over"));
         if (tr && tr.dataset.idx != null) { tr.classList.add("over"); overIdx = +tr.dataset.idx; }
       };
-      const onUp = () => {
-        document.removeEventListener("pointermove", onMove);
-        document.removeEventListener("pointerup", onUp);
+      const done = () => {
+        grip.onpointermove = null; grip.onpointerup = null; grip.onpointercancel = null;
+        list.querySelectorAll(".trow.over").forEach((n) => n.classList.remove("over"));
         row.classList.remove("drag");
         if (overIdx != null && overIdx !== dragFrom) move(dragFrom, overIdx);
         dragFrom = null;
       };
-      document.addEventListener("pointermove", onMove);
-      document.addEventListener("pointerup", onUp);
+      grip.onpointerup = done;
+      grip.onpointercancel = done;
     };
     row.appendChild(grip);
     const inp = el("input"); inp.type = "text"; inp.value = name; inp.maxLength = 30;

@@ -107,7 +107,7 @@ header{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;
 /* teams step: reorderable list */
 .teamlist{display:flex;flex-direction:column;gap:4px;max-height:52vh;overflow:auto;
   padding-right:2px}
-.trow{display:grid;grid-template-columns:18px 1fr 34px;gap:8px;align-items:center;
+.trow{display:grid;grid-template-columns:26px 1fr 34px;gap:8px;align-items:center;
   padding:3px 6px 3px 4px;border:1px solid var(--line-soft);border-radius:6px;
   background:var(--raised)}
 .trow.thead{background:transparent;border-color:transparent;padding-top:0;padding-bottom:2px;
@@ -118,8 +118,15 @@ header{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;
 .trow.isme{border-color:var(--gold-dim)}
 .trow.drag{opacity:.4}
 .trow.over{border-color:var(--gold);box-shadow:inset 0 2px 0 var(--gold)}
-.trow .grip{color:var(--faint);cursor:grab;font-family:var(--mono);font-size:12px;
-  text-align:center;user-select:none}
+.trow .grip{color:var(--faint);cursor:grab;font-family:var(--mono);font-size:14px;
+  text-align:center;user-select:none;touch-action:none;align-self:stretch;
+  display:flex;align-items:center;justify-content:center}
+.trow .grip:active{cursor:grabbing}
+/* fatter drag handle on touch devices, where the thumb needs a real target */
+@media (pointer: coarse) {
+  .trow{grid-template-columns:40px 1fr 40px}
+  .trow .grip{font-size:20px}
+}
 .trow input[type=text]{font:inherit;padding:4px 8px;border:1px solid transparent;
   border-radius:4px;background:transparent;color:var(--text);width:100%}
 .trow input[type=text]:hover{border-color:var(--line)}
@@ -821,7 +828,7 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
       <div class="gdiv"></div>
       <button id="menuReset" class="gdanger">Clear all sales</button>
       <div class="gdiv"></div>
-      <div class="ver gver">V49</div>
+      <div class="ver gver">V50</div>
     </div>
   </span>
 </header>
