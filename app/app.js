@@ -60,20 +60,20 @@ const wizardState = {
   roster: { QB: 1, RB: 2, WR: 3, TE: 1, FLEX: 1, K: 1, DEF: 1, BN: 5 },
   preset: "half",
   knobs: { ...DEFAULT_KNOBS },
-  teamNames: [], teamOrig: [], me: 0,
+  teamNames: [], teamOrig: [], me: 0, resumeAt: null,
 };
 
 /* Platform selection was removed from the wizard (V3): it had no effect at
  * setup time. The paste-import flow asks for the format at the moment it
  * actually matters. */
-const STEPS = ["League", "Roster", "Scoring", "Teams", "Data"];
+const STEPS = ["League", "Roster", "Scoring", "Teams", "Projections", "Market"];
 
 function resetWizardState() {
   Object.assign(wizardState, {
     step: 0, editing: false, name: "", teams: 12, budget: 200,
     roster: { QB: 1, RB: 2, WR: 3, TE: 1, FLEX: 1, K: 1, DEF: 1, BN: 5 },
     preset: "half", knobs: { ...DEFAULT_KNOBS }, teamNames: [],
-    teamOrig: [], me: 0,
+    teamOrig: [], me: 0, resumeAt: null,
   });
 }
 
@@ -225,9 +225,24 @@ function renderWizard() {
   box.appendChild(nav);
   root.appendChild(box);
 
-  const steps = [stepLeague, stepRoster, stepScoring, stepTeams, stepData];
+  const steps = [stepLeague, stepRoster, stepScoring, stepTeams, stepData, stepMarket];
   steps[wizardState.step](body, nav);
   renderLeaguePicker();
+  /* Focus the step's first control so Enter always has somewhere to land;
+   * on the card steps that is the primary card, which Enter clicks natively. */
+  const first = body.querySelector(
+    "input:not([type=radio]):not([disabled]), textarea, .optcard.primary");
+  if (first) first.focus();
+  /* Enter advances on the primary action (blur first so a number field's
+   * pending change commits before Next reads it). */
+  box.onkeydown = (e) => {
+    if (e.key !== "Enter" || e.shiftKey) return;
+    const tag = e.target.tagName;
+    if (tag === "TEXTAREA" || tag === "BUTTON") return;
+    const n = nav.querySelector("button.primary");
+    if (!n) return;
+    e.preventDefault(); e.target.blur(); n.click();
+  };
 }
 
 function navButtons(nav, { back = true, next = "Next", onNext }) {
@@ -444,39 +459,74 @@ async function saveLeagueEdit() {
   stampShow("SAVED", "league settings updated");
 }
 
-function stepData(body, nav) {
-  body.appendChild(el("h2", null, "Your projections"));
-  body.appendChild(el("p", "hint",
-    "The board is built from projections you bring: FantasyPros, CBS, a " +
-    "spreadsheet, any rankings list. Import them now, or see the board first " +
-    "with Sleeper's public projections and add your own any time."));
+/* The two ways to get projections in. Sleeper first: it is the one-click
+ * path that gets a stranger to a board. Used by the wizard and by the empty
+ * board. afterSleeper / resumeAt say where each path lands. */
+function projectionCards({ afterSleeper, resumeAt }) {
   const cards = el("div", "optcards");
-  const mine = el("button", "optcard primary");
-  mine.innerHTML = `<b>Import my projections</b><small>Paste or upload a CSV; you confirm the column mapping.</small>`;
-  mine.onclick = async () => {
-    await finishWizard();
-    importState = { kind: "projections" };
-    renderImport();
-  };
-  const sleeper = el("button", "optcard");
-  sleeper.innerHTML = `<b>Start with Sleeper's public projections</b><small>One click, straight from your browser, so you can see the board now.</small>`;
   const msg = el("p", "msg");
+  const sleeper = el("button", "optcard primary");
+  const title = "Start with Sleeper's public projections";
+  sleeper.innerHTML = `<b>${title}</b><small>One click, straight from your browser. See the board now; add your own sources any time.</small>`;
   sleeper.onclick = async () => {
     sleeper.disabled = true; sleeper.querySelector("b").textContent = "Fetching...";
     try {
-      await finishWizard();
+      if (!doc || !doc.league) await finishWizard();
       await doFetchSleeper();
-      renderBoardScreen();
+      afterSleeper();
     } catch (e) {
       msg.textContent = `Fetch failed (${e.message}). If you are offline, ` +
-        "reconnect and try again; the wizard settings are saved.";
-      sleeper.disabled = false;
-      sleeper.querySelector("b").textContent = "Start with Sleeper's public projections";
+        "reconnect and try again; your settings are saved.";
+      sleeper.disabled = false; sleeper.querySelector("b").textContent = title;
     }
   };
-  cards.appendChild(mine); cards.appendChild(sleeper);
+  const mine = el("button", "optcard");
+  mine.innerHTML = `<b>Import my projections</b><small>FantasyPros, CBS, a spreadsheet, any rankings list. Paste or upload; you confirm the column mapping.</small>`;
+  mine.onclick = async () => {
+    if (!doc || !doc.league) await finishWizard();
+    wizardState.resumeAt = resumeAt ?? null;
+    importState = { target: "my" };
+    renderImport();
+  };
+  cards.appendChild(sleeper); cards.appendChild(mine);
+  const wrap = el("div");
+  wrap.appendChild(cards); wrap.appendChild(msg);
+  return wrap;
+}
+
+function stepData(body, nav) {
+  body.appendChild(el("h2", null, "Projections (My$)"));
+  body.appendChild(el("p", "hint",
+    "My$ is built from projections. Start with Sleeper's to see the board " +
+    "now, or bring your own; with more than one source the board blends them."));
+  body.appendChild(projectionCards({
+    afterSleeper: async () => {
+      await finishWizard(); wizardState.step++; renderWizard();
+    },
+    resumeAt: 5,
+  }));
+  navButtons(nav, { next: "Next", onNext: () => {} });
+  nav.querySelector("button.primary").hidden = true;   // the cards are the actions
+}
+
+function stepMarket(body, nav) {
+  body.appendChild(el("h2", null, "Market values (Bid$)"));
+  body.appendChild(el("p", "hint",
+    "Optional. Import today's Yahoo or ESPN auction values. They never touch " +
+    "My$: they are rescaled to your league's money as Bid$, the estimate of " +
+    "what your room will pay, and +/- then shows where the deals are. Without " +
+    "them The Call still fires; only Bid$ and +/- stay blank."));
+  const cards = el("div", "optcards");
+  const imp = el("button", "optcard primary");
+  imp.innerHTML = `<b>Import Yahoo or ESPN values</b><small>Copy the values page or upload the CSV; you confirm the column mapping.</small>`;
+  imp.onclick = async () => {
+    await finishWizard();
+    wizardState.resumeAt = null;
+    importState = { target: "market", kind: "values" };
+    renderImport();
+  };
+  cards.appendChild(imp);
   body.appendChild(cards);
-  body.appendChild(msg);
   navButtons(nav, {
     next: "Skip for now",
     onNext: async () => { await finishWizard(); renderBoardScreen(); },
@@ -584,14 +634,27 @@ function renderImport() {
   const panel = el("div", "bigpanel");
   root.appendChild(panel);
   panel.appendChild(el("h2", null, "Add data"));
-  panel.appendChild(el("p", "hint",
-    "Add the values that the rest of your league will likely be using. " +
-    "Import today's Yahoo or ESPN values (avg salary) as a csv or copy " +
-    "and paste plain text here."));
-  panel.appendChild(el("p", "hint",
-    "If your source is not actual auction salary values, you can also use " +
-    "other formats (projection or player rankings); the app detects what " +
-    "you pasted."));
+  /* Two distinct things can be added, and they never mix: projections feed
+   * My$; market values become Bid$. The user picks which, up front. */
+  importState.target = importState.target
+    ?? (importState.kind === "values" ? "market" : "my");
+  const pick = el("div", "optcards two");
+  const mk = (t, title, sub) => {
+    const b = el("button", `optcard${importState.target === t ? " primary" : ""}`);
+    b.innerHTML = `<b>${title}</b><small>${sub}</small>`;
+    b.onclick = () => { importState.target = t; renderImport(); };
+    return b;
+  };
+  pick.appendChild(mk("my", "My$ projections",
+    "A projections export or a rankings list (FantasyPros, CBS, a spreadsheet). Joins the blend behind My$."));
+  pick.appendChild(mk("market", "Market values (Bid$)",
+    "Today's Yahoo or ESPN auction values. Never touch My$; they become Bid$ and light up +/-."));
+  panel.appendChild(pick);
+  panel.appendChild(el("p", "hint", importState.target === "market"
+    ? "Copy the values page from Yahoo or ESPN and paste it, or upload the CSV. " +
+      "You confirm the column mapping next."
+    : "Paste the export or upload the CSV. Stat-line projections and plain " +
+      "rankings lists both work; you confirm the column mapping next."));
 
   const ta = el("textarea");
   ta.rows = 10;
@@ -616,19 +679,30 @@ function renderImport() {
   panel.appendChild(msg);
   const nav = el("div", "wiznav");
   const cancel = el("button", "ghost", "Cancel");
-  cancel.onclick = () => { importState = null; renderBoardScreen(); };
+  cancel.onclick = () => afterImport();
   nav.appendChild(cancel);
   const prev = el("button", "primary", "Preview");
   prev.onclick = () => {
     const parsed = parsePaste(importState.text ?? "");
     if (!parsed.rows.length) { msg.textContent = "Nothing parseable found."; return; }
     importState.parsed = parsed;
-    importState.kind = detectKind(parsed);
+    if (importState.target === "market") importState.kind = "values";
+    else { const k = detectKind(parsed); importState.kind = k === "values" ? "rankings" : k; }
     setMapping();
     renderMapper();
   };
   nav.appendChild(prev);
   panel.appendChild(nav);
+}
+
+/* Where an import lands when it finishes or is cancelled: back into the
+ * wizard if the wizard launched it, otherwise the board. */
+function afterImport() {
+  importState = null;
+  if (wizardState.resumeAt != null) {
+    wizardState.step = wizardState.resumeAt; wizardState.resumeAt = null;
+    renderWizard();
+  } else renderBoardScreen();
 }
 
 function setMapping() {
@@ -823,7 +897,7 @@ async function finishImport() {
       reference = doc.sources[srcNames[0]].players;
     } else {
       alert("Fetch or import projections first; rankings need a curve to map onto.");
-      importState = null; renderBoardScreen(); return;
+      afterImport(); return;
     }
     const withPos = matched.map((m) => ({ ...m, pos: posOf.get(m.pid) }))
       .filter((m) => m.pos);
@@ -833,8 +907,7 @@ async function finishImport() {
     await makeRun();
   }
   await saveDoc(doc);
-  importState = null;
-  renderBoardScreen();
+  afterImport();
 }
 
 /* --------------------------------------------------------------- board */
@@ -1912,15 +1985,8 @@ function renderBoardScreen() {
 
   if (!curRun) {
     const empty = el("div", "empty");
-    empty.appendChild(el("p", null,
-      "No projections yet. Fetch to populate the board."));
-    const btn = el("button", "primary", "Fetch projections");
-    btn.onclick = async () => {
-      btn.disabled = true;
-      try { await doFetchSleeper(); renderBoardScreen(); }
-      catch (e) { btn.textContent = `Failed: ${e.message}`; }
-    };
-    empty.appendChild(btn);
+    empty.appendChild(el("p", null, "No projections yet. The board needs them."));
+    empty.appendChild(projectionCards({ afterSleeper: () => renderBoardScreen() }));
     root.appendChild(empty);
     return;
   }
@@ -2354,6 +2420,12 @@ async function boot() {
       "forget everything here when it closes. Keep a file you own.");
   });
   refreshSaveStatus();
+  /* the logo is always the way home */
+  $("#mast .mark").onclick = () => {
+    if (!doc || !doc.league) return;
+    importState = null; wizardState.editing = false; wizardState.resumeAt = null;
+    renderBoardScreen();
+  };
   const importInput = $("#importfile");
   importInput.onchange = async () => {
     if (!importInput.files.length) return;

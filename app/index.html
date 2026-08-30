@@ -89,7 +89,10 @@ header{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;
   border-bottom:2px solid var(--c-line);background:var(--c-bg)}
 #mast{font-family:var(--disp);font-size:15px;letter-spacing:.12em;
   color:var(--c-brand);white-space:nowrap;display:flex;align-items:center;gap:9px}
-#mast .mark{width:26px;height:26px;flex:none;border-radius:6px}
+#mast .mark{width:26px;height:26px;flex:none;border-radius:6px;cursor:pointer}
+#mast .mark:hover{filter:brightness(1.25)}
+.optcards.two{grid-template-columns:1fr 1fr;margin:0 0 14px}
+.empty .optcards{max-width:520px;margin:14px auto 0;text-align:left}
 #mast small{display:block;font-family:var(--ui);font-size:9px;
   letter-spacing:.26em;color:var(--c-muted);font-weight:700;margin-top:2px}
 #leaguesel{font:inherit;font-family:var(--ui);font-size:11px;letter-spacing:.04em;
@@ -814,7 +817,7 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
       <div class="gdiv"></div>
       <button id="menuReset" class="gdanger">Reset board (clear all sales)</button>
       <div class="gdiv"></div>
-      <div class="ver gver">V43 (parity)</div>
+      <div class="ver gver">V44 (parity)</div>
     </div>
   </span>
 </header>
