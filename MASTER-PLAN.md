@@ -19,6 +19,8 @@ The personal tool in `levi-sheet/` is NOT modified by this workstream. It remain
 
 ## The calendar reality
 
+> Update (2026-08-30): the public launch was pulled forward and the app is LIVE now at https://liquid-sheets.pages.dev/. The 2026-vs-2027 reasoning below is the original plan, kept for the record and superseded by the live launch.
+
 Fantasy draft season runs late August to early September. Today is 2026-08-17. There is no responsible path to a public launch for the 2026 season.
 
 - **Target: public beta by July 2027, launch for the 2027 draft season.**

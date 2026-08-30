@@ -1,11 +1,10 @@
 # Reddit post - DRAFT (not posted)
 
-Status: draft for Levi's review, 2026-08-29. Not posted anywhere.
+Status: draft for Levi's review. Not posted anywhere. Framed for a live launch (the app is public at https://liquid-sheets.pages.dev/).
 
 Notes before posting:
-- MASTER-PLAN.md targets a public beta for the 2027 season; the README still
-  says "in build." Posting now means framing it as an early look, not a launch.
-  The draft below is written that way.
+- The app is live (README status is "live", the repo is public). This draft is
+  framed as a real launch asking for feedback, not an "early look".
 - r/fantasyfootball is strict on self-promotion (tool posts usually need mod
   approval or the weekly tools thread); r/FFCommish and r/DynastyFF are friendlier
   to open-source tools. Read the current rules of whichever sub before posting.
@@ -26,7 +25,7 @@ Notes before posting:
 
 **Body:**
 
-I run an auction league and have spent years patching together spreadsheets. This offseason I turned my private draft tool into a free, open-source web app. It is early (aiming for a proper release next season) but it works, and I would rather get feedback from people who actually auction draft than build in a vacuum.
+I run an auction league and have spent years patching together spreadsheets. I turned my private draft tool into a free, open-source web app, and it is live now. It is new, so I would rather get feedback from people who actually auction draft than polish in a vacuum.
 
 Link: `<URL>` (nothing to install, no account, no cost)
 
@@ -36,7 +35,7 @@ You give it your league settings and your own projections. It turns them into au
 
 **How the values are built (the whole model, four steps)**
 
-1. **Bring your own projections, blend them.** One click pulls Sleeper's public projections. You can paste in more (Yahoo, ESPN, FantasyPros, any rankings list). With more than one source, the board averages them, because a blend beats any single forecaster.
+1. **Bring your own projections, blend them.** One click pulls Sleeper's public projections. You can paste in more (FantasyPros, CBS, a spreadsheet, any rankings list). With more than one source, the board averages them, because a blend beats any single forecaster. (Yahoo/ESPN auction values go in separately as "market values" and become the Bid$ estimate, so you can see the deals.)
 
 2. **Re-scored under YOUR rules.** Points are recomputed from raw stats using the scoring you entered. This is why the numbers differ from any public sheet: they are for your league, not a generic one.
 
@@ -60,7 +59,7 @@ That is the entire model. There is no hidden sauce, and every number on the boar
 
 Auction drafts move fast, so data entry was designed to get out of the way:
 
-- Setup is a five-step wizard with defaults filled in. Most people change three or four numbers.
+- Setup is a short wizard with defaults filled in. Most people change three or four numbers, then one click for Sleeper projections gets you to a board.
 - Projections are one click (Sleeper) or paste-anything: it detects the format, guesses the column mapping, and you confirm two dropdowns. When a site changes its export next August, you fix a dropdown instead of waiting on an app update.
 - Logging a sale is: nominated player is already staged, type the price, pick the team, Enter. Undo is a double-tap of Escape.
 - Keyboard everywhere: search-and-Enter to stage, arrow keys across the team grid, no mouse required mid-draft.

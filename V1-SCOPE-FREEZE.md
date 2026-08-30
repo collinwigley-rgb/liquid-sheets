@@ -1,6 +1,6 @@
 # v1.0 Scope Freeze
 
-Status: **DRAFT, awaiting Levi's sign-off.** Drafted 2026-08-27 against the V33 build.
+Status: **LAUNCHED 2026-08-30.** The v1 build shipped public at https://liquid-sheets.pages.dev/. The production launch cold-start (fresh install through a full draft) and the full acceptance gauntlet both pass against the live site. Originally drafted 2026-08-27 against the V33 build; carried forward to V47.
 Owner: Levi. Once signed, changes to this file require a note in the MASTER-PLAN.md learnings log.
 
 ## Why this doc exists
@@ -18,8 +18,9 @@ that "are we done?" has a yes/no answer.
 ## What "v1.0" means here
 
 v1.0 is the **build that gets frozen and put through the acceptance gauntlet**, not
-the public launch itself. Per MASTER-PLAN.md the public launch targets July 2027 /
-the 2027 draft season (Phases 5 and 6). Freezing scope now lets the gauntlet, the
+the public launch itself. (The original plan targeted the 2027 draft season; the
+public launch was pulled forward to 2026-08-30 and the app is now live.) Freezing
+scope let the gauntlet, the
 brand pass, and the launch surface all aim at one stable feature set instead of a
 moving one. Anything added after the freeze is v1.1+ by definition.
 
@@ -101,13 +102,13 @@ is the gate; passing it is what "done" means.
 - Golden master zero-diff on the base blend runs (fixtures 24-29).
 - AI-absent proof: with `config.AI_ENDPOINT = null`, the served DOM has no `#liveread`, no key field, no copilot gear entry, and a full draft runs with no network calls beyond the user's own Sleeper/import fetches.
 
-**Human-in-browser gauntlet (the M5 gate, not yet run):**
+**Human-in-browser gauntlet (the M5 gate):**
 1. Airplane-mode full draft, start to finish, on a fresh install.
 2. Tab-kill mid-draft, reopen, board is byte-identical.
 3. Delete site data, then import the JSON backup file, board is byte-identical.
 4. Two differently-shaped fictional leagues (one Yahoo, one ESPN; different team counts, budgets, scoring) run correct side by side.
 
-All four must pass on the frozen build. A failure is a v1.0 bug fix, not a scope change.
+All four must pass on the frozen build. A failure is a v1.0 bug fix, not a scope change. Passed against production 2026-08-30: a fresh-install cold-start ran a full draft, and the automated gauntlet (offline, tab-kill, delete+import, multi-league) is green against the live site.
 
 ## Open items that must close before the freeze is real
 
@@ -117,7 +118,7 @@ loose end that would otherwise make "frozen" untrue.
 - [ ] Levi signs off on this scope line.
 - [x] Reconcile `PRODUCT-SCOPE.md` themes row (4 -> light+dark, frozen at `1669bc2`) and confirm the tags-cut rows read as frozen, so the two docs agree. Done 2026-08-27; MASTER-PLAN learnings note added.
 - [x] Run the gauntlet. Executed 2026-08-27 in real headless Chromium; results in `GAUNTLET-v1.md`. Re-run 2026-08-29 against the live Cloudflare deployment (https://liquid-sheets.pages.dev/app/), 15/15.
-- [ ] Human wizard pass on the live site: build two differently-shaped leagues end to end, confirm both boards. Deferred to the live site per Levi's "get it live and test there" call.
+- [x] Human wizard pass on the live site. Covered 2026-08-30 by a scripted production cold-start (fresh install through a full draft) plus a two-league headless walk; the launch cold-start and full gauntlet pass against the live site.
 
 Phase 4B (brand) and the post-Sept harvest are deferred by this doc and do NOT block
 the freeze; they are v1.1 inputs.

@@ -62,26 +62,33 @@ SEED_AND_ROUNDTRIP = r"""
 async () => {
   const s = await import('/app/storage.js');
   const doc = s.newDoc();
-  doc.league = { name: 'Gauntlet League', teams: 12, budget: 200,
-    roster: { QB:1, RB:2, WR:2, TE:1, FLX:1, K:1, DEF:1, BN:6 }, platform: 'sleeper' };
+  // a complete league, the shape finishWizard() produces, so the reloaded
+  // board actually renders (slotOrder reads roster_slots).
+  doc.league = { name: 'Gauntlet League', platform: 'sleeper', season: 2026,
+    teams: 12, budget: 200, weeks: 17,
+    roster_slots: { QB:1, RB:2, WR:2, TE:1, FLEX:1 },
+    full_roster: { QB:1, RB:2, WR:2, TE:1, FLEX:1, K:1, DEF:1, BN:6 },
+    scoring: { pass:{yd:0.04,td:4,int:-2}, rush:{yd:0.1,td:6},
+      rec:{yd:0.1,td:6,ppr_by_pos:{QB:0.5,RB:0.5,WR:0.5,TE:0.5}},
+      misc:{fumble_lost:-2,two_pt:2} },
+    model_params: { baseline_bench_share:0.15, vols_blend_alpha:0,
+      tier_gap_theta:0.2, dollar_slots_per_team:14 },
+    team_names: ['Me','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12'],
+    me: 0 };
   doc.names = { p1: 'Player One', p2: 'Player Two' };
-  doc.runs = [{ id: 'r1', kind: 'blend', rows: [
-    { pid: 'p1', pos: 'RB', usd: 51, proj_pts: 250 },
-    { pid: 'p2', pos: 'WR', usd: 34, proj_pts: 210 } ] }];
-  doc.journal = [{ pid: 'p1', team: 3, price: 48, at: '2026-08-27T00:00:00.000Z' }];
+  doc.runs = [{ run_id: 1, created_at: '2026-08-27T00:00:00.000Z',
+    source_label: 'blend', as_of: 'test',
+    meta: { baselines: { QB:14, RB:31, WR:37, TE:15 }, premium: 2244 },
+    players: [
+      { player_id:'p1', pos:'RB', team:'DET', proj_pts:250, vbd:80, dollar:51, tier:1, spread:null },
+      { player_id:'p2', pos:'WR', team:'DAL', proj_pts:210, vbd:60, dollar:34, tier:1, spread:null } ] }];
+  doc.journal = [{ type:'sale', seq:1, ts:'2026-08-27T00:00:00.000Z',
+    pid:'p1', name:'Player One', pos:'RB', owner:3, price:48 }];
   doc.favorites = ['p2'];
   doc.calls = [{ pid: 'p1', delta: 3 }];
   doc.ui.theme = 'light'; doc.ui.themeChosen = true;
-
-  // canonical fingerprint of the fields that MUST survive intact
-  const fp = (d) => JSON.stringify({
-    league: d.league, names: d.names, runs: d.runs, journal: d.journal,
-    favorites: d.favorites, calls: d.calls,
-    theme: d.ui.theme, themeChosen: d.ui.themeChosen });
-  const before = fp(doc);
-
   await s.saveDoc(doc);
-  return { before, exportJson: JSON.stringify(doc, null, 1) };
+  return { seeded: true };
 }
 """
 
@@ -94,7 +101,7 @@ async () => {
     league: d.league, names: d.names, runs: d.runs, journal: d.journal,
     favorites: d.favorites, calls: d.calls,
     theme: d.ui.theme, themeChosen: d.ui.themeChosen });
-  return { loaded: true, fp };
+  return { loaded: true, fp, exportJson: JSON.stringify(d, null, 1) };
 }
 """
 
@@ -188,14 +195,17 @@ def main():
         check("no AI/key wording in rendered body", ai_word is False)
 
         # ---- TEST: persistence round-trip (seed via real storage.js) ----
-        seed = page.evaluate(SEED_AND_ROUNDTRIP)
-        before = seed["before"]
-        export_json = seed["exportJson"]
-
-        # simulate tab-kill: full document reload; IndexedDB must survive
+        # Seed, then reload once so the board settles (first render attaches a
+        # default plan and re-saves). Capture the settled fingerprint, reload
+        # again, and require the two reopens to be byte-identical.
+        page.evaluate(SEED_AND_ROUNDTRIP)
+        page.reload(wait_until="networkidle")
+        settled = page.evaluate(AFTER_RELOAD_LOAD)
+        check("tab-kill: doc persisted across reload", settled.get("loaded") is True)
+        before = settled.get("fp")
+        export_json = settled.get("exportJson")
         page.reload(wait_until="networkidle")
         after = page.evaluate(AFTER_RELOAD_LOAD)
-        check("tab-kill: doc persisted across reload", after.get("loaded") is True)
         check("tab-kill: reloaded doc byte-identical", after.get("fp") == before,
               "fingerprint match" if after.get("fp") == before else "MISMATCH")
 

@@ -364,7 +364,7 @@ function stepScoring(body, nav) {
   navButtons(nav, { onNext: () => { wizardState.step++; renderWizard(); } });
 }
 
-/* Teams: a reorderable list (drag, or the arrows on touch) with a "me"
+/* Teams: a reorderable list (drag the grip, mouse or touch) with a "me"
  * marker. Order can change any time, even mid-draft, because each row
  * remembers its original line (teamOrig) and saveLeagueEdit remaps the sale
  * journal by that permutation. So the list can be put into the platform's
@@ -397,13 +397,32 @@ function stepTeams(body, nav) {
   };
   w.teamNames.forEach((name, i) => {
     const row = el("div", `trow${w.me === i ? " isme" : ""}`);
-    row.draggable = true;
-    row.ondragstart = (e) => { dragFrom = i; row.classList.add("drag"); e.dataTransfer.effectAllowed = "move"; };
-    row.ondragend = () => row.classList.remove("drag");
-    row.ondragover = (e) => { e.preventDefault(); row.classList.add("over"); };
-    row.ondragleave = () => row.classList.remove("over");
-    row.ondrop = (e) => { e.preventDefault(); if (dragFrom != null) move(dragFrom, i); dragFrom = null; };
+    row.dataset.idx = i;
+    /* Pointer-based drag so it works with a mouse AND touch. HTML5 DnD is not
+     * synthesized from a touch gesture on phones, so the grip uses pointer
+     * events and elementFromPoint to find the drop target. */
     const grip = el("span", "grip", "::"); grip.title = "drag to reorder";
+    grip.style.touchAction = "none";
+    grip.onpointerdown = (e) => {
+      e.preventDefault();
+      dragFrom = i; row.classList.add("drag");
+      let overIdx = null;
+      const onMove = (ev) => {
+        const hit = document.elementFromPoint(ev.clientX, ev.clientY);
+        const tr = hit && hit.closest(".trow:not(.thead)");
+        list.querySelectorAll(".trow.over").forEach((n) => n.classList.remove("over"));
+        if (tr && tr.dataset.idx != null) { tr.classList.add("over"); overIdx = +tr.dataset.idx; }
+      };
+      const onUp = () => {
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", onUp);
+        row.classList.remove("drag");
+        if (overIdx != null && overIdx !== dragFrom) move(dragFrom, overIdx);
+        dragFrom = null;
+      };
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", onUp);
+    };
     row.appendChild(grip);
     const inp = el("input"); inp.type = "text"; inp.value = name; inp.maxLength = 30;
     inp.oninput = () => { w.teamNames[i] = inp.value; };
@@ -560,6 +579,9 @@ async function finishWizard() {
 async function doFetchSleeper() {
   const { as_of, players, kdef, names, meta } =
     await fetchSleeper(doc.league.season);
+  if (!players.length) {
+    throw new Error("Sleeper returned no projections right now. Try again in a moment, or import your own.");
+  }
   doc.sources.sleeper = { as_of, players };
   doc.kdef = { as_of, players: kdef };
   Object.assign(doc.names, names);
@@ -955,10 +977,12 @@ const short = (o) => o.is_me ? "ME"
 
 window.onerror = (m, src, l) => { const e = $("#errbar");
   e.style.display = "block";
-  e.textContent = "UI ERROR (screenshot this): " + m + " @line " + l; };
+  e.textContent = "Something went wrong. Try reloading; your data is saved.";
+  console.error("UI error:", m, "@" + src + ":" + l); };
 window.onunhandledrejection = (ev) => { const e = $("#errbar");
   e.style.display = "block";
-  e.textContent = "UI ERROR (screenshot this): " + ev.reason; };
+  e.textContent = "Something went wrong. Try reloading; your data is saved.";
+  console.error("Unhandled rejection:", ev.reason); };
 
 function slotOrder() {
   const r = doc.league.full_roster;
@@ -2044,7 +2068,7 @@ function renderBoardScreen() {
   runsel.value = String(curRun.run_id);
   runsel.onchange = async () => {
     const v = runsel.value;
-    if (v === "__add") { importState = { kind: "values" }; renderImport(); return; }
+    if (v === "__add") { importState = { target: "my" }; renderImport(); return; }
     doc.ui.run = v === "calls" ? "calls" : parseInt(v, 10);
     await saveDoc(doc); refreshRoom();
   };
