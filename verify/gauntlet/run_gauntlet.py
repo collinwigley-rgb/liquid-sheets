@@ -120,6 +120,38 @@ async (exportJson) => {
 """
 
 
+# Multi-league: add a second league through the real storage API, confirm
+# both are listed, the shared sources/names are visible from the new one,
+# switching back returns the first league byte-for-byte, and deleting works
+# down to an empty app.
+MULTI = r"""
+async () => {
+  const s = await import('/app/storage.js');
+  const a = await s.loadDoc();
+  const fpA = JSON.stringify({ league: a.league, runs: a.runs, journal: a.journal,
+    favorites: a.favorites, calls: a.calls });
+  const b = s.newDoc();
+  b.league = { name: 'Second', teams: 10, budget: 300 };
+  b.ui.theme = a.ui.theme; b.ui.themeChosen = a.ui.themeChosen;
+  b.sources = a.sources; b.names = a.names; b.player_meta = a.player_meta;
+  await s.saveDoc(b);
+  const list = await s.listLeagues();
+  const cur = await s.loadDoc();
+  const sharedNames = Object.keys(cur.names).length === Object.keys(a.names).length;
+  await s.setActive(a.id);
+  const back = await s.loadDoc();
+  const okA = JSON.stringify({ league: back.league, runs: back.runs, journal: back.journal,
+    favorites: back.favorites, calls: back.calls }) === fpA;
+  await s.deleteLeague(b.id);
+  const after = await s.listLeagues();
+  await s.deleteLeague(a.id);
+  const none = await s.loadDoc();
+  return { two: list.length === 2, curIsB: cur.league.name === 'Second', sharedNames,
+    okA, oneLeft: after.length === 1, none: none === null };
+}
+"""
+
+
 def main():
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -173,6 +205,15 @@ def main():
         check("recovery: importDocFile restored the doc", rec.get("restoredOk") is True)
         check("recovery: restored doc byte-identical", rec.get("fp") == before,
               "fingerprint match" if rec.get("fp") == before else "MISMATCH")
+
+        # ---- TEST: multi-league (a league is a doc; sources shared) ----
+        multi = page.evaluate(MULTI)
+        check("multi: second league saved and listed", multi.get("two") is True)
+        check("multi: new league is active after save", multi.get("curIsB") is True)
+        check("multi: shared sources/names visible from second league", multi.get("sharedNames") is True)
+        check("multi: switching back returns first league intact", multi.get("okA") is True)
+        check("multi: delete leaves one, delete last -> empty", multi.get("oneLeft") is True and multi.get("none") is True)
+        page.evaluate(RECOVERY, export_json)   # restore for the offline pass
 
         # ---- TEST: offline / airplane mode ----
         # ensure the service worker controls the page first

@@ -11,7 +11,7 @@ import { activeSales, appendSale, appendUnsale, ownerStates,
 import { PRIOR, PRIOR_SEASON } from "./prior_2026.js";
 import { loadDoc, saveDoc, wipeDoc, newDoc, exportDoc, importDocFile,
   onSaved, requestPersist, storageLooksTemporary, canSaveToFile,
-  linkedFileName, saveToFile }
+  linkedFileName, saveToFile, listLeagues, setActive, deleteLeague }
   from "./storage.js";
 import { fetchSleeper } from "./sleeper.js";
 import { myPlanState, planFit, defaultPlan } from "./plan.js";
@@ -67,6 +67,94 @@ const wizardState = {
  * setup time. The paste-import flow asks for the format at the moment it
  * actually matters. */
 const STEPS = ["League", "Roster", "Scoring", "Teams", "Data"];
+
+function resetWizardState() {
+  Object.assign(wizardState, {
+    step: 0, editing: false, name: "", teams: 12, budget: 200,
+    roster: { QB: 1, RB: 2, WR: 3, TE: 1, FLEX: 1, K: 1, DEF: 1, BN: 5 },
+    preset: "half", knobs: { ...DEFAULT_KNOBS }, teamNames: [],
+  });
+}
+
+/* ---------------- leagues ----------------
+ * A league is a doc (see storage.js). Switching flushes the current doc,
+ * activates another, reloads, resets everything derived from the old doc,
+ * and takes the same path as boot: board if set up, else the wizard. */
+let pendingNewFrom = null;   // league to return to if a new league's wizard is cancelled
+
+function resetDerivedState() {
+  curRun = null; curSales = []; importState = null; wizardState.editing = false;
+  try { resetSale(); } catch (e) { /* no sale form on this screen */ }
+  if (cp && cp.cancel) { try { cp.cancel(); } catch (e) { /* ignore */ } }
+}
+
+async function switchLeague(id) {
+  if (doc && doc.id != null) await saveDoc(doc);
+  await setActive(id);
+  doc = await loadDoc();
+  pendingNewFrom = null;
+  resetDerivedState(); applyTheme();
+  if (doc && doc.league) renderBoardScreen(); else renderWizard();
+}
+
+async function addLeague() {
+  if (doc && doc.id != null) await saveDoc(doc);
+  pendingNewFrom = doc ? doc.id : null;
+  const theme = doc ? doc.ui.theme : "dark";
+  const chosen = doc ? doc.ui.themeChosen : false;
+  const shared = doc ? { sources: doc.sources, names: doc.names,
+    player_meta: doc.player_meta } : null;
+  doc = newDoc();
+  doc.ui.theme = theme; doc.ui.themeChosen = chosen;
+  if (shared) Object.assign(doc, shared);   // sources are app-wide
+  resetDerivedState(); resetWizardState(); renderWizard();
+}
+
+async function cancelNewLeague() {
+  const back = pendingNewFrom; pendingNewFrom = null;
+  if (back != null) await switchLeague(back);
+}
+
+async function deleteCurrentLeague() {
+  const gone = doc.league ? doc.league.name : "league";
+  await deleteLeague(doc.id);
+  doc = null;                 // never let switchLeague flush the deleted doc back
+  const rest = await listLeagues();
+  resetDerivedState();
+  if (rest.length) {
+    await switchLeague(rest[0].id);
+    stampShow("DELETED", gone);
+  } else {
+    doc = newDoc(); resetWizardState(); renderWizard();
+  }
+}
+
+const escHtml = (s) => String(s).replace(/[&<>"]/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+/* The masthead picker: every league by name, plus "Add new league". */
+async function renderLeaguePicker() {
+  const sel = $("#leaguesel");
+  if (!sel) return;
+  const leagues = await listLeagues();
+  const dup = {};
+  leagues.forEach((l) => { dup[l.name] = (dup[l.name] || 0) + 1; });
+  let html = "";
+  for (const l of leagues) {
+    const lab = dup[l.name] > 1 ? `${l.name} (${l.teams}x$${l.budget})` : l.name;
+    html += `<option value="${l.id}"${doc && doc.id === l.id ? " selected" : ""}>${escHtml(lab)}</option>`;
+  }
+  if (doc && doc.id == null) html += `<option value="__pending" selected>New league...</option>`;
+  html += `<option disabled>------------</option><option value="__new">+ Add new league</option>`;
+  sel.innerHTML = html;
+  sel.onchange = () => {
+    const v = sel.value;
+    if (v === "__new") {
+      sel.value = doc && doc.id != null ? String(doc.id) : "__pending";
+      addLeague();
+    } else if (v !== "__pending") switchLeague(+v);
+  };
+}
 
 /* Reopen the wizard prefilled from the saved league so any setup decision
  * can be revisited. Edit mode drops the Data step (sources are kept) and ends
@@ -137,6 +225,7 @@ function renderWizard() {
 
   const steps = [stepLeague, stepRoster, stepScoring, stepTeams, stepData];
   steps[wizardState.step](body, nav);
+  renderLeaguePicker();
 }
 
 function navButtons(nav, { back = true, next = "Next", onNext }) {
@@ -149,6 +238,10 @@ function navButtons(nav, { back = true, next = "Next", onNext }) {
   if (wizardState.editing) {
     const c = el("button", "ghost", "Cancel");
     c.onclick = () => { wizardState.editing = false; renderBoardScreen(); };
+    left.appendChild(c);
+  } else if (pendingNewFrom != null) {
+    const c = el("button", "ghost", "Cancel");
+    c.onclick = () => cancelNewLeague();
     left.appendChild(c);
   }
   nav.appendChild(left);
@@ -188,6 +281,22 @@ function stepLeague(body, nav) {
     (v) => { wizardState.teams = v; }, {
       locked: salesExist
         ? "Locked while sales exist (reset the board to change it)" : "" }));
+  if (wizardState.editing) {
+    /* Delete lives with the other league-level decisions. Armed like Reset. */
+    const wrap = el("div", "delwrap");
+    const b = el("button", "ghost danger tiny", "Delete this league");
+    let armed = 0;
+    b.onclick = async () => {
+      if (Date.now() - armed > 5000) {
+        armed = Date.now(); b.textContent = "Click again to CONFIRM delete";
+        setTimeout(() => { b.textContent = "Delete this league"; armed = 0; }, 5000);
+        return;
+      }
+      await deleteCurrentLeague();
+    };
+    wrap.appendChild(b);
+    body.appendChild(wrap);
+  }
   body.appendChild(numInput("Auction budget per team ($)", wizardState.budget,
     50, 1000, (v) => { wizardState.budget = v; }));
   navButtons(nav, { onNext: () => { wizardState.step++; renderWizard(); } });
@@ -315,6 +424,7 @@ function totalRosterSpots(roster) {
 
 async function finishWizard() {
   if (!doc) doc = newDoc();
+  pendingNewFrom = null;      // a finished wizard is a real league now
   const w = wizardState;
   doc.league = {
     name: w.name.trim() || `${w.teams}-team league`,
@@ -1152,10 +1262,12 @@ function renderChips() {
   } else {
     $("#lastchip").innerHTML = `<span class="lab">last sale</span><b>none yet</b>`;
   }
-  const mast = $("#spendline");
-  const L = doc.league;
-  mast.textContent = (L.name || `${L.teams} TEAMS X $${L.budget}`) +
-    (doc.market ? ` X MARKET ${mScale.toFixed(2)}` : "");
+  const sel = $("#leaguesel");
+  if (sel) {
+    const L = doc.league;
+    sel.title = `${L.teams} teams x $${L.budget}` +
+      (doc.market ? `; market scale ${mScale.toFixed(2)}` : "") + ". Switch or add a league.";
+  }
 }
 
 /* ---------------- favorites ----------------
@@ -1720,8 +1832,7 @@ function renderBoardScreen() {
   const root = $("#main");
   root.innerHTML = "";
   buildModel();
-  const L = doc.league;   // league name under the wordmark, run or no run
-  $("#spendline").textContent = L.name || `${L.teams} TEAMS X $${L.budget}`;
+  renderLeaguePicker();   // league picker under the wordmark, run or no run
 
   /* masthead line, mirroring the predecessor: run selector + last sale on the
    * left, inflation centered, flow strip on the right (built with the rail) */

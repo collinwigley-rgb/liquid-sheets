@@ -1,6 +1,10 @@
 # Multi-league plan
 
-Status: PROPOSED 2026-08-30, awaiting Levi's sign-off. Nothing here is built.
+Status: BUILT 2026-08-30 (V41), as designed below with the two decisions in
+the later sections (sources shared app-wide; backup is the whole app). Kept as
+the design record. Verified by five multi-league checks in
+`verify/gauntlet/run_gauntlet.py` (20/20) and a headless UI walk of
+add / cancel / add / switch / delete, plus a legacy single-doc migration test.
 
 ## What Levi asked for
 

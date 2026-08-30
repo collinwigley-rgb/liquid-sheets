@@ -91,7 +91,15 @@ header{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;
   color:var(--c-brand);white-space:nowrap;display:flex;align-items:center;gap:9px}
 #mast .mark{width:26px;height:26px;flex:none;border-radius:6px}
 #mast small{display:block;font-family:var(--ui);font-size:9px;
-  letter-spacing:.26em;color:var(--c-muted);font-weight:700}
+  letter-spacing:.26em;color:var(--c-muted);font-weight:700;margin-top:2px}
+#leaguesel{font:inherit;font-family:var(--ui);font-size:11px;letter-spacing:.04em;
+  font-weight:700;color:var(--c-muted);background:transparent;
+  border:1px solid var(--c-line);border-radius:4px;padding:1px 4px;max-width:220px;
+  cursor:pointer}
+#leaguesel:hover,#leaguesel:focus{color:var(--c-text);border-color:var(--c-gold);
+  outline:none}
+#leaguesel option{color:var(--text);background:var(--surface)}
+.delwrap{margin-top:18px;padding-top:12px;border-top:1px solid var(--line-soft)}
 .gver{color:var(--c-muted);font-size:10px;font-family:var(--mono);
   padding:4px 10px 2px;text-align:right}
 .gearwrap{position:relative}
@@ -745,7 +753,7 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
 <header>
   <div id="mast">
     <svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#12171e"/><polygon points="14,22 32,32 32,52 14,42" fill="#3f8fa3"/><polygon points="32,32 50,22 50,42 32,52" fill="#63b2c6"/><polygon points="32,12 50,22 32,32 14,22" fill="#a8dbe6"/><polygon points="10,31 32,43 54,31 32,19" fill="#eaf7fa" fill-opacity=".82" stroke="#63b2c6" stroke-width="1.2"/><polygon points="32,12 50,22 50,42 32,52 14,42 14,22" fill="none" stroke="#d6f0f5" stroke-width="1.4" stroke-linejoin="round"/></svg>
-    <span>LIQUID SHEETS<small id="spendline">AUCTION DRAFT VALUES</small></span>
+    <span>LIQUID SHEETS<small id="spendline"><select id="leaguesel" title="switch or add a league"></select></small></span>
   </div>
   <div id="hleft"></div>
   <span class="hspace"></span>
@@ -772,7 +780,7 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
       <div class="gdiv"></div>
       <button id="menuReset" class="gdanger">Reset board (clear all sales)</button>
       <div class="gdiv"></div>
-      <div class="ver gver">V40 (parity)</div>
+      <div class="ver gver">V41 (parity)</div>
     </div>
   </span>
 </header>
