@@ -52,6 +52,7 @@ const DEFAULT_KNOBS = {
 const wizardState = {
   step: 0,
   editing: false,   // true when reopened from the gear to edit doc.league
+  name: "",
   platform: "yahoo",
   teams: 12, budget: 200,
   roster: { QB: 1, RB: 2, WR: 3, TE: 1, FLEX: 1, K: 1, DEF: 1, BN: 5 },
@@ -72,6 +73,7 @@ function openLeagueEditor() {
   const L = doc.league;
   const w = wizardState;
   w.editing = true; w.step = 0;
+  w.name = L.name || "";
   w.teams = L.teams; w.budget = L.budget;
   w.roster = { ...L.full_roster };
   w.teamNames = [...L.team_names];
@@ -167,6 +169,15 @@ function numInput(labelText, value, min, max, onchange, { locked = "" } = {}) {
 
 function stepLeague(body, nav) {
   body.appendChild(el("h2", null, "League shape"));
+  const nameWrap = el("label", "field");
+  nameWrap.appendChild(el("span", null, "League name"));
+  const nameInp = el("input");
+  nameInp.type = "text"; nameInp.maxLength = 40; nameInp.className = "wide";
+  nameInp.placeholder = "e.g. Sunday Night Degenerates";
+  nameInp.value = wizardState.name;
+  nameInp.oninput = () => { wizardState.name = nameInp.value; };
+  nameWrap.appendChild(nameInp);
+  body.appendChild(nameWrap);
   /* Team count is locked once sales exist: sales reference team slots, so
    * shrinking the league would orphan them. Everything else stays editable. */
   const salesExist = wizardState.editing && doc
@@ -304,6 +315,7 @@ async function finishWizard() {
   if (!doc) doc = newDoc();
   const w = wizardState;
   doc.league = {
+    name: w.name.trim() || `${w.teams}-team league`,
     platform: w.platform, season: PRIOR_SEASON,
     teams: w.teams, budget: w.budget, weeks: 17,
     roster_slots: { QB: w.roster.QB, RB: w.roster.RB, WR: w.roster.WR,
@@ -1138,7 +1150,8 @@ function renderChips() {
     $("#lastchip").innerHTML = `<span class="lab">last sale</span><b>none yet</b>`;
   }
   const mast = $("#spendline");
-  mast.textContent = `${doc.league.teams} TEAMS X $${doc.league.budget}` +
+  const L = doc.league;
+  mast.textContent = (L.name || `${L.teams} TEAMS X $${L.budget}`) +
     (doc.market ? ` X MARKET ${mScale.toFixed(2)}` : "");
 }
 
@@ -1703,6 +1716,8 @@ function renderBoardScreen() {
   const root = $("#main");
   root.innerHTML = "";
   buildModel();
+  const L = doc.league;   // league name under the wordmark, run or no run
+  $("#spendline").textContent = L.name || `${L.teams} TEAMS X $${L.budget}`;
 
   /* masthead line, mirroring the predecessor: run selector + last sale on the
    * left, inflation centered, flow strip on the right (built with the rail) */
