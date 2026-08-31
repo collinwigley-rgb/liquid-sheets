@@ -5,7 +5,8 @@
  * position's top-24 level. The cross-position effect (RBs miss more than
  * WRs) is well supported and kept; the slot-by-slot gradient is
  * underpowered on ~11 seasons (p~0.13), so half of it is shrunk away.
- * See ingest/shrink_prior.py. Attribution: nflverse.com,
+ * Why and how: docs/adr/0008-regularize-availability-prior.md; the method is
+ * reproducible in verify/prior/ (data gitignored). Attribution: nflverse.com,
  * fantasyfootballcalculator.com. */
 export const PRIOR_SEASON = 2026;
 export const PRIOR = [

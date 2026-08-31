@@ -8,3 +8,7 @@ verify/fixtures*/
 # Python bytecode
 __pycache__/
 *.pyc
+
+# availability-prior reproduction: method is public, licensed raw data is not
+verify/prior/data/
+verify/prior/out/

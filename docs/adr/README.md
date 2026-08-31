@@ -12,6 +12,9 @@ The private predecessor's ADRs are not copied here, but the practice is inherite
 | [ADR-0004](./0004-one-app-plus-post-launch-power-kit.md) | One app for everyone; the AI-savvy path ships as a post-launch power kit, not a second version | Accepted | 2026-08-18 |
 | [ADR-0005](./0005-plain-structures-indexeddb-storage.md) | Store state as plain JS structures persisted to IndexedDB; no in-browser SQL | Accepted | 2026-08-18 |
 | [ADR-0006](./0006-ai-copilot-self-hosted-companion-not-in-app.md) | The AI live read ships as an optional self-hosted companion server, not in the hosted app | Accepted | 2026-08-25 |
+| [ADR-0007](./0007-a-league-is-a-doc.md) | Multiple leagues: a league is a document, stored under its own IndexedDB key | Accepted | 2026-08-30 |
+| [ADR-0008](./0008-regularize-availability-prior.md) | Regularize the availability prior: shrink the underpowered slot gradient | Accepted | 2026-08-31 |
+| [ADR-0009](./0009-my-dollar-and-bid-dollar-are-separate-inputs.md) | My$ and Bid$ are separate inputs; market values never enter the My$ blend | Accepted | 2026-08-30 |
 
 ## Status Legend
 
