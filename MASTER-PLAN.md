@@ -183,3 +183,27 @@ Appended at each phase exit.
 - **CI is guarding `main`** (`.github/workflows/ci.yml`): static checks + the browser gauntlet on every push and PR; first run green. Golden master stays a local gate (gitignored fixtures).
 - **Production smoke test passed:** the gauntlet harness (now `GAUNTLET_BASE`-parameterizable) ran against the live Cloudflare URL, 15/15 - AI-absent, offline over HTTPS from the edge, tab-kill persistence, and delete+import recovery all confirmed on the real deployment, not just localhost.
 - **Still open:** the human wizard pass (two league shapes) is now done on the live site rather than locally, per Levi's "get it live and test there" call; and the CF custom-domain wiring.
+
+### Session handoff (2026-09-01)
+
+**State: LAUNCHED and live.** V53, public at https://sheets.liquidworkflows.com/ (and the backup https://liquid-sheets.pages.dev/), git-connected to Cloudflare Pages so a push to `main` auto-deploys. Repo: github.com/liquid-workflows/liquid-sheets (org owned by Levi). Everything is committed and pushed (local == origin).
+
+**Where a new session should start:** `RUNBOOK.md` is the operational bible (local dev `./dev.sh` on 8013, the hard rules, verification gates, deploy, rollback, the two-account push gotcha). Decisions: `docs/adr/` (0001-0009). History + learnings: this file above. Scope: `V1-SCOPE-FREEZE.md` / `PRODUCT-SCOPE.md`. Multi-league design: `docs/plans/MULTI-LEAGUE-PLAN.md`. Prior method: `verify/prior/README.md`.
+
+**Critical operational facts:**
+- Push: the machine's default git identity is the WCK account and 403s on this org repo. Push as Levi's personal token: `git push "https://LeviZ:$(gh auth token --user LeviZ)@github.com/liquid-workflows/liquid-sheets.git" main`.
+- Version discipline: any change to a shell file (`app/*`, `engine/*`) bumps BOTH the masthead (`app/index.html` `<span class="ver">`) AND the SW cache (`app/sw.js` `CACHE`). Currently V53 / liquid-sheets-v53.
+- Verify before push: `node --check` all JS; no em/en dashes or non-ASCII (`grep -rlP '[\x{2014}\x{2013}]|[^\x00-\x7F]'`); golden master (`node verify/run_golden.mjs verify/fixtures_29`, local only, fixtures gitignored); gauntlet (`/Library/Developer/CommandLineTools/usr/bin/python3 verify/gauntlet/run_gauntlet.py` with dev.sh up, or `GAUNTLET_BASE=https://sheets.liquidworkflows.com/app/` for prod). Gauntlet is 20/20.
+- Two Python interpreters on this machine: `/usr/bin/python3` has pandas/numpy (the `verify/prior/` scripts); `/Library/Developer/CommandLineTools/usr/bin/python3` owns Playwright/Chromium (the gauntlet and all headless browser work and screenshots). No matplotlib; charts are Chromium screenshots of inline SVG/HTML.
+
+**What this session shipped (V33 -> V53):** scope/theme freeze + acceptance gauntlet; deploy to Cloudflare Pages + custom domain; repo transfer to the org; removed the landing page (bare domain -> /app/); multi-league ("a league is a doc", ADR-0007); wizard rework (6 steps, stepper, fixed card size, drag-and-touch team reorder with a chosen "me", a League-settings editor); My$/Bid$ separation (ADR-0009); Save-to-file + storage-visibility + private-window notice; "Under the hood" rewrite (How To / What is My$?); brand mark and favicon; availability fade toggle then regularization (ADR-0008); CI (static checks + gauntlet); ADRs 0007-0009 and the reproducible prior method in `verify/prior/`.
+
+**The availability-stats context (behind the Reddit drafts):** the RB/WR games-missed analysis drew public pushback. Honest finding: the position-level effect (RBs miss more than WRs) is robust and replicated; the slot gradient is underpowered (RB1-3 vs RB5-10 is ~2 games but p~0.13). Response: regularized the shipped prior (ADR-0008, shrink the gradient 50%) and built a season-resample bootstrap (`verify/prior/bootstrap_availability.py`). Reddit artifacts: `docs/launch/reddit-post-draft.md` (tool post), `docs/launch/reddit-data-post-draft.md` (data post), and `../levi-sheet/research/reddit-data-addon.md` (the "underpowered, here is the bootstrap" edit). None posted.
+
+**Open / offered but not built:**
+- Reddit posts drafted, NOT posted. Levi decides where/when (plan: r/fantasyfootball data post first; check sub self-promo rules).
+- Deferred nice-to-haves: apple-touch-icon (iOS home-screen); a "deals" board screenshot using Levi's real Yahoo/ESPN values.
+- Offered follow-ups: a commit-safe mock backup with Sleeper sources stripped; a mock regenerated with market values so the Bid$/+/- columns populate; a lagged prior-season-workload injury analysis (a commenter's ask).
+- `mock-draft-1-3.json` sits in the repo root but is GITIGNORED (embeds Sleeper projections, must not be committed per constraint #1). It is a ~1/3-through 12-team auction backup Levi imports to explore a mid-draft board.
+
+**Do not modify:** `../levi-sheet/` is the private predecessor and Levi's personal tool, and the home of the raw availability data. The public repo is self-contained; raw licensed data stays gitignored (golden master and `verify/prior/` follow "public method, private data").

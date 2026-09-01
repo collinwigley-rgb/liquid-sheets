@@ -40,33 +40,33 @@ Posting notes:
 
 ## TL;DR (put this line at the very top of the body)
 
-It does the calculations no human could do in the seconds after a player is nominated so you can actually use those insights to make a decision.
+It does the calculations no human could do in the seconds after a player is nominated, gives a verdict, so you can actually use those data insights to make a decision.
 
-Bring your own data. No login, runs entirely in your browser (nothing uploaded, nothing saved on a server). Bring your own projections, it does the draft-day math. Link at the bottom.**
+Bring your own data. No login, runs entirely in your browser. No server. No cloud.
 
 ## Body
 
-I am a data engineer. I have drafted off BeerSheets for years, and every year I wanted it to do more, so about a month ago I started building my own. I only meant to give myself an edge in my own league. It came out better than I expected, so here it is.
+I am a data engineer. I only meant to give myself an edge in my own league. It came out better than I expected, so here it is.
 
-Here is the thing it does that I cannot do in my head at the table.
-
-It is early in your auction and someone nominates Bijan Robinson. You have about four seconds. The tool already knows: he is worth $68 to your roster, only one comparable back is left before the tier falls off an $8 cliff, and eleven other funded teams still need a starting RB. The read: this is your last real shot at that tier, so pay full value.
+Someone nominates Amon. You have about four seconds. The tool already knows: he is worth $50 to your roster, only 1 comparable WR is left before the tier falls off a cliff, and eleven other funded teams still need a starting WR. 
 
 [SCREENSHOT: shot_call.png]
 
-That is not a ranking. It is a read on scarcity, your budget, and the room, done in the half second between the nomination and your bid. Nominate a player (type his name, hit enter) and it fires instantly.
+It is a call on position scarcity, your budget, and the room. Nominate a player (start typing his name, hit enter) and it fires instantly.
 
-And the value it is reading from is yours, not a generic sheet. Every number is built from projections you bring (one click pulls Sleeper's, or paste FantasyPros, CBS, or your own), re-scored under your league's exact settings, and scaled to your budget and roster. Paste your league's Yahoo or ESPN values on top and it shows you which players the room is about to underpay for.
+And the value it is reading from is your own. It's built from projections you bring (one click pulls Sleeper's, or paste FantasyPros, CBS, or your own), adapted to your league's exact settings (a la BeerSheets), and then scaled to your budget and roster. 
+
+Bring in your league's Yahoo or ESPN values on top and it shows you which players youe league mates are likely to underpay/overpay for (in relation). 
 
 [SCREENSHOT: shot_board.png]
 
-A few things that mattered to me, since I did not want to build another account to manage:
+things:
 
-- **Free.** No login, no paywall, nothing to sign up for.
-- **It lives only in your browser.** Nothing is uploaded, nothing is stored on a server, no tracking. Close the tab and your draft is right where you left it.
-- **Open source.** Every value traces back to a calculation you can open and read; there is no black box.
+- No login, no paywall, nothing.
+- Private. **It lives only in your browser.** Nothing is uploaded, nothing is stored on a server, no cloud interaction. 
+- **Open source.** You can view every line of code. 
 
-I built it for myself, so it is auction-only and a little opinionated. If you auction draft, take it into a mock and tell me where it is wrong or where it slowed you down. That feedback is the only thing I want out of this.
+I built it for myself, so it is auction-only. If you auction draft, take it into a mock and give it a rip.
 
 Link: https://sheets.liquidworkflows.com/
 

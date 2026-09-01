@@ -12,3 +12,6 @@ __pycache__/
 # availability-prior reproduction: method is public, licensed raw data is not
 verify/prior/data/
 verify/prior/out/
+
+# local mock backup: embeds Sleeper projections, do not redistribute
+mock-draft-1-3.json
