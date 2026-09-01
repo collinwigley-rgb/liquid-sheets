@@ -1600,6 +1600,7 @@ function advise(p) {
   const est = (doc.market && p.y_avg != null)
     ? Math.max(1, Math.round(p.y_avg * mScale * inf.ratio)) : null;
   const val = p.usd != null ? Math.max(1, Math.round(p.usd)) : 1;
+  let worth = val;   /* the displayed value; K/DEF override it with the plan */
   const myMax = oStates().find((o) => o.is_me).max;
   const reasons = [];
 
@@ -1622,11 +1623,23 @@ function advise(p) {
   const elig = ["K", "DEF"].includes(p.pos) ? [] : ps.openStarters.filter((s) =>
     s.lab === p.pos
     || (s.lab === "FLX" && ["RB", "WR", "TE"].includes(p.pos)));
+  /* roster-aware: his own starter slot is already filled and the only open fit
+   * is your FLX, a slot an RB or WR fills just as well. His position's market
+   * scarcity is not YOUR cliff, so it must not force LAST CHANCE (ADR-0010). */
+  const flexOnly = elig.length > 0 && elig.every((s) => s.lab === "FLX");
 
-  let cls, label, max, planCap;
+  let cls, label, max, planCap, envMax = val;
   if (p.pos === "K" || p.pos === "DEF") {
-    cls = "bench"; label = "$1 RULE"; max = 1; planCap = 1;
-    reasons.push("kickers and defenses are $1 players; never bid $2");
+    /* no hardcoded $1 rule: K/DEF spend is the owner's call, set by the budget
+     * plan's own allocation for the slot (ADR-0011). No plan -> a soft $1. */
+    const kslot = ps.slots.find((s) => s.lab === p.pos && !s.who);
+    const envK = ps.hasPlan
+      ? Math.max(1, kslot ? (kslot.eff ?? kslot.planned ?? 1) : 1) : 1;
+    worth = envK; max = envK; planCap = Math.min(envK, myMax);
+    cls = "value"; label = "FAIR VALUE";
+    reasons.push(ps.hasPlan
+      ? `your budget plan sets ~$${envK} here`
+      : "late-round spot; ~$1 is typical unless your plan says otherwise");
   } else if (fit && fit.bench) {
     cls = "pass"; label = "BENCH ONLY"; max = Math.min(2, myMax);
     planCap = Math.max(1, Math.min(ps.benchPer, myMax));
@@ -1637,21 +1650,26 @@ function advise(p) {
       + (ps.openStarters.length ? "; starters still open: "
         + ps.openStarters.map((s) => s.lab).join(" ") : ""));
   } else {
-    const envMax = fit ? fit.max : val;
+    envMax = fit ? fit.max : val;
     planCap = Math.min(envMax, myMax);
-    const cliffPressure = comparable != null && comparable <= 2 && contest >= 2
-      && (drop == null || drop >= 8);
+    /* the scarcity cliff only creates urgency for a slot you still need; when
+     * he can only take your FLX it does not, so flexOnly suppresses it */
+    const cliffPressure = !flexOnly && comparable != null && comparable <= 2
+      && contest >= 2 && (drop == null || drop >= 8);
     if (deal != null && deal <= -4 && !cliffPressure) {
-      cls = "pass"; label = "LET HIM GO"; max = val;
+      cls = "pass"; label = "LET HIM GO"; max = Math.min(val, envMax);
     } else if (cliffPressure) {
       cls = "last"; label = "LAST CHANCE"; max = val;
       reasons.push(`only ${comparable} comparable ${p.pos}${comparable === 1 ? "" : "s"} left`
         + (drop != null ? ` before a $${drop} drop` : "")
         + ` and ${contest} funded owners still need one; paying full value is correct here`);
     } else if (deal != null && deal >= 2) {
-      cls = "target"; label = "TARGET"; max = val;
+      cls = "target"; label = "TARGET"; max = Math.min(val, envMax);
     } else {
-      cls = "value"; label = "FAIR VALUE"; max = val;
+      cls = "value"; label = "FAIR VALUE"; max = Math.min(val, envMax);
+    }
+    if (flexOnly) {
+      reasons.push(`your ${p.pos} is filled; he only fits your FLX, or bench`);
     }
     if (comparable != null && !cliffPressure) {
       reasons.push(`${comparable} comparable ${p.pos}${comparable === 1 ? "" : "s"} left, `
@@ -1664,7 +1682,17 @@ function advise(p) {
     reasons.push(`money drying up (x${inf.ratio.toFixed(2)}): patience is being paid`);
   }
   if (p.inj) reasons.push("injury status: " + p.inj);
-  return { cls, label, max: Math.max(1, Math.min(max, myMax)), worth: val,
+  /* when the actionable ceiling sits below his value, say WHY in plain words
+   * rather than a bare "capped": it is either his roster fit or your budget */
+  const finalMax = Math.max(1, Math.min(max, myMax));
+  let ceilWhy = "";
+  if (finalMax < worth) {
+    ceilWhy = myMax < max ? "the budget you have left"
+      : (fit && fit.bench) ? "bench only, no starter slot open"
+      : flexOnly ? "FLX and reserve money, hold your RB and WR options"
+      : "your plan's room for this slot";
+  }
+  return { cls, label, max: finalMax, worth, ceilWhy,
     planCap, benchPer: ps.benchPer, benchOpen: ps.benchOpen, est, reasons,
     elig };
 }
@@ -1680,8 +1708,12 @@ function renderCall(p) {
          <span class="pl">~${fmt$(a.benchPer)}</span></div></div>`
       : "");
   $("#call").style.display = "block";
+  const ceilLine = a.max < a.worth
+    ? `<div class="cceil">spend up to <b>$${a.max}</b> <small>${a.ceilWhy}</small></div>`
+    : "";
   $("#call").innerHTML = `<span class="cverdict ${a.cls}">${a.label}</span>
-    <div class="cmax" title="the break-even ceiling from my value model - past this you provably overpaid.">worth <b>$${a.max}</b></div>
+    <div class="cmax" title="my value for this player: the break-even. Past this you provably overpaid.">worth <b>$${a.worth}</b></div>
+    ${ceilLine}
     ${a.est ? `<div class="cest">room bids <b>~$${a.est}</b></div>` : ""}
     ${slotRows}
     <ul>${a.reasons.slice(0, 5).map((r) => `<li>${r}</li>`).join("")}</ul>`;

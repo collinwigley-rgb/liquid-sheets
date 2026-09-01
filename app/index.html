@@ -173,6 +173,12 @@ header{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;
 .gtoggle.on .sw .knob{left:18px}
 .gearmenu button.gdanger{color:var(--bad);font-weight:700}
 .gearmenu button.gdanger:hover{background:var(--c-bg)}
+/* direct actions (no sub-panel) read as pressable buttons, not menu rows */
+.gearmenu button.gact{border:1px solid var(--c-line);background:var(--c-bg);
+  margin:3px 2px;font-weight:600;text-align:center}
+.gearmenu button.gact:hover{background:var(--c-line)}
+.gearmenu button.gact.gdanger{border-color:var(--bad)}
+.gearmenu button.gact.gdanger:hover{background:var(--c-line)}
 
 /* ---------- topbar chips row ---------- */
 .topbar{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap;
@@ -321,6 +327,10 @@ header{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;
 .cmax{margin-top:7px;font-size:14px}
 .cmax b{font-family:var(--mono);font-size:18px;color:var(--gold)}
 .cmax span{color:var(--faint);font-size:12px;font-family:var(--mono)}
+/* actionable ceiling when it sits below his value: secondary to the gold worth */
+.cceil{margin-top:3px;font-size:13px;color:var(--muted)}
+.cceil b{font-family:var(--mono);font-size:15px;color:var(--text)}
+.cceil small{color:var(--faint);font-size:11.5px}
 #call ul{margin:7px 0 0;padding-left:16px}
 #call li{font-size:12.5px;color:var(--muted);margin:3px 0;line-height:1.4}
 #saleform{margin-top:10px}   /* always on screen (V55): price, roster, owners, DRAFT */
@@ -825,15 +835,14 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
       <div class="gdiv"></div>
       <button id="menuTheme" class="gtoggle"><span>Dark mode</span><span class="sw"><span class="knob"></span></span></button>
       <div class="gdiv"></div>
-      <button id="menuLeague">League settings</button>
+      <button id="menuHelp">How To</button>
       <button id="menuPlan">Budget plan</button>
-      <button id="menuHelp">Under the hood</button>
+      <button id="menuLeague">League settings</button>
       <div class="gdiv"></div>
-      <button id="menuSleeper">Import Sleeper values</button>
+      <button id="menuSleeper" class="gact">Import Sleeper values</button>
+      <button id="menuReset" class="gact gdanger">Clear all sales</button>
       <div class="gdiv"></div>
-      <button id="menuReset" class="gdanger">Clear all sales</button>
-      <div class="gdiv"></div>
-      <div class="ver gver">V53</div>
+      <div class="ver gver">V55</div>
     </div>
   </span>
 </header>
