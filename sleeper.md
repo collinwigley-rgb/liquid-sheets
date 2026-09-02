@@ -191,14 +191,27 @@ pull. Skip unless a real need for it turns up.
   `GET /v1/draft/1389342583871766529/picks` for the live pick list once
   it starts. This mirrors the read-only pattern FantasyEngine's own
   `api/lib/live-draft.ts` already uses against Sleeper.
-- Mock draft room: Sleeper mock drafts are created through the Sleeper
-  app/site UI (not creatable via a plain API call as far as documented),
-  and get their own separate `draft_id` outside any real league. Collin
-  needs to actually start a mock draft in the Sleeper app first; once he
-  does, the same picks-polling endpoint pattern above works against that
-  mock draft_id. This is a `blocked-on-data` item on issue #6 until a
-  mock draft_id exists -- ping Collin for it once he's created one, don't
-  guess an ID.
+- **Mock draft, live now (as of 2026-09-02): `draft_id 1400867924423528448`.**
+  Started by Collin from the Sleeper app (`type: "league_mock"`,
+  `metadata.league_id` points back at the real Money_Talks league),
+  `status: "drafting"`. Same endpoints as the real draft, just a
+  different draft_id:
+  `GET /v1/draft/1400867924423528448` and
+  `GET /v1/draft/1400867924423528448/picks`. CPU-drafts the other 11
+  teams automatically (`draft_order` only lists Collin's user_id), so
+  it's a good target to build/test the live-read polling code against
+  right now without waiting for Friday.
+- The mock's first 11 picks are byte-for-byte the same 11 keepers as the
+  real draft (same amounts, same players), **including the Travis
+  Etienne / roster 11 anomaly noted above at the same slot** -- since the
+  mock is seeded from the real league's board, this confirms that pick
+  already existed on the real draft before the mock was started, not
+  caused by it. Still worth Collin double-checking directly in Sleeper,
+  but it's not mock-bleed-through.
+- This mock draft_id is temporary/session-specific -- don't hardcode it
+  as a permanent fixture; treat it as a live example to build the
+  polling logic against, and expect Collin to start fresh ones as
+  needed.
 
 ## Full player database (names, positions, teams)
 
