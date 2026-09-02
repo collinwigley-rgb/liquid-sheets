@@ -1281,9 +1281,15 @@ function addRow(p, target, kdef) {
         : `<span class="mkt">${p.y_avg != null ? fmt$(p.y_avg) : "$1"}</span>`);
   } else {
     /* skill rows always show bid$ / +/- / my$; a sold row keeps my value
-     * (struck through + surplus tint), the buyer shows in the popup (V53) */
+     * (struck through + surplus tint), the buyer shows in the popup (V53).
+     * Once sold, the +/- column switches from "deal vs the market" (no
+     * longer the live question) to "actual price vs projected My$" -- how
+     * far above or below the model's own estimate the real sale landed,
+     * and the usd cell switches to the real price paid instead of the
+     * pre-sale My$ estimate. */
     const bid = p.y_avg != null ? "$" + Math.round(p.y_avg * mScale) : "";
     const cd = callOf(p.id);
+    const paidVsProj = sold ? Math.round(sale.price - (p.usd ?? 1)) : null;
     row.innerHTML =
       `<span class="tier">${p.tier ?? ""}</span>`
       + `<span class="nm">${p.name}<span class="tm">${p.team || ""}</span>`
@@ -1292,8 +1298,10 @@ function addRow(p, target, kdef) {
       + (isFav(p.id) ? `<span class="favm" title="favorite">&#9733;</span>` : "")
       + (cd ? `<span class="callm ${cd > 0 ? "up" : "dn"}" title="your call: ${cd > 0 ? "+" : ""}${cd}">${cd > 0 ? "+" : ""}${cd}</span>` : "") + `</span>`
       + `<span class="pts" title="estimated bid the room pays: your market source's average x the money-supply scale (x${mScale.toFixed(2)})">${bid}</span>`
-      + `<span class="edge ${edge == null ? "" : Math.round(edge) > 0 ? "up" : Math.round(edge) < 0 ? "dn" : ""}" title="${edge == null ? "" : edge > 0 ? "a $" + Math.round(edge) + " deal vs the expected bid" : "$" + Math.round(-edge) + " over my value"}">${edge == null ? "" : (Math.round(edge) > 0 ? "+" : "") + Math.round(edge)}</span>`
-      + `<span class="usd" title="${usdRangeTitle(p.usd)}">${fmt$(p.usd)}</span>`;
+      + (sold
+        ? `<span class="edge ${paidVsProj < 0 ? "up" : paidVsProj > 0 ? "dn" : ""}" title="sold for $${sale.price} vs My$ $${Math.round(p.usd ?? 1)} -- ${paidVsProj < 0 ? "$" + (-paidVsProj) + " under projected (a deal)" : paidVsProj > 0 ? "$" + paidVsProj + " over projected" : "right at projected value"}">${paidVsProj === 0 ? "=" : (paidVsProj > 0 ? "+" : "") + paidVsProj}</span>`
+        : `<span class="edge ${edge == null ? "" : Math.round(edge) > 0 ? "up" : Math.round(edge) < 0 ? "dn" : ""}" title="${edge == null ? "" : edge > 0 ? "a $" + Math.round(edge) + " deal vs the expected bid" : "$" + Math.round(-edge) + " over my value"}">${edge == null ? "" : (Math.round(edge) > 0 ? "+" : "") + Math.round(edge)}</span>`)
+      + `<span class="usd" title="${sold ? `sold for $${sale.price} (My$ was $${Math.round(p.usd ?? 1)})` : usdRangeTitle(p.usd)}">${sold ? fmt$(sale.price) : fmt$(p.usd)}</span>`;
   }
   /* single click = popup; double click = nominate (ported timing trick) */
   row.onclick = () => {
