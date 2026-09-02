@@ -115,6 +115,7 @@ export const MONEY_TALKS_LEAGUE = {
   team_names: ${JSON.stringify(teamNames)},
   me: ${meIndex},
   sleeper_league_id: "${LEAGUE_ID}",
+  sleeper_draft_id: "${league.draft_id}",
 };
 `;
 

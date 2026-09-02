@@ -17,8 +17,10 @@ import { fetchSleeper } from "./sleeper.js";
 import { myPlanState, planFit, defaultPlan } from "./plan.js";
 import { AI_ENABLED, AI_ENDPOINT } from "./config.js";
 import { MONEY_TALKS_LEAGUE } from "./money_talks_config.js";
+import { pollDraft } from "./live_draft.js";
 
 let doc = null;
+let liveSyncStop = null;   // stop() from pollDraft(), non-null only while live sync is on
 const $ = (sel) => document.querySelector(sel);
 const el = (tag, cls, text) => {
   const n = document.createElement(tag);
@@ -650,6 +652,47 @@ async function makeRun() {
     players: result.players,
   });
   await saveDoc(doc);
+}
+
+/* ---------------------------------------------------------- live draft
+ * Read-only Sleeper draft sync (issues #5/#6). Ingests every pick Sleeper
+ * has recorded -- including keepers, which is how this also satisfies
+ * issue #3 (mark kept players unavailable, deduct their real cost from
+ * budget) without separate special-case code: a keeper is just a pick
+ * with a real dollar amount, same as any other sale. Dedupes on player id
+ * already being an active sale, since a real draft never sells the same
+ * player twice -- no extra journal schema needed. Never writes back to
+ * Sleeper. */
+async function syncDraftPicks(picks) {
+  const alreadySold = new Set(activeSales(doc.journal).map((s) => s.pid));
+  let added = 0;
+  for (const p of picks) {
+    if (alreadySold.has(p.playerId)) continue;
+    if (p.rosterId == null || p.amount == null) continue;
+    const known = byId[p.playerId];
+    appendSale(doc, {
+      pid: p.playerId,
+      name: known ? known.name : p.name,
+      pos: known ? known.pos : p.pos,
+      owner: p.rosterId - 1,   // team_names is ordered by roster_id 1..teams
+      price: p.amount,
+    });
+    added++;
+  }
+  if (added) { await saveDoc(doc); renderBoardScreen(); }
+}
+
+function toggleLiveSync() {
+  if (liveSyncStop) {
+    liveSyncStop(); liveSyncStop = null;
+  } else if (doc.league.sleeper_draft_id) {
+    liveSyncStop = pollDraft(doc.league.sleeper_draft_id, {
+      onPicks: (picks) => { syncDraftPicks(picks); },
+      onError: (e) => console.warn("live draft sync: poll failed, will retry", e),
+      intervalMs: 5000,
+    });
+  }
+  renderBoardScreen();
 }
 
 /* -------------------------------------------------------------- import */
@@ -2184,6 +2227,16 @@ function renderBoardScreen() {
 
   renderBoard(); renderTeams(); renderOwners(); renderRoster();
   renderChips(); renderFavorites(); renderFlow(); applyTab();
+  /* appended after renderFlow(), which fully overwrites #flow's innerHTML
+   * -- adding this earlier gets silently wiped by that call. */
+  if (hf && doc.league.sleeper_draft_id) {
+    const b = el("button", "ghost tiny",
+      liveSyncStop ? "Live sync: ON" : "Live sync: OFF");
+    b.title = "Read-only: pulls picks (including keepers) from the real " +
+      "Sleeper draft/mock every 5s. Never writes back to Sleeper.";
+    b.onclick = () => toggleLiveSync();
+    hf.appendChild(b);
+  }
 }
 
 /* re-render everything after a state change, preserving staged state */

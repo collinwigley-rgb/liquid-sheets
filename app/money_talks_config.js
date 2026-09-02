@@ -69,4 +69,5 @@ export const MONEY_TALKS_LEAGUE = {
   team_names: ["LaPorta Potty","Back Akers","Pacheckin her out","lukelangan","Jettin' Magic","Blood, Sweat and Beers","Game of Mahomes","Peekegbuka","Lights Out","Skol","Gibb Me My Money","MoNami21"],
   me: 1,
   sleeper_league_id: "1389342583871766528",
+  sleeper_draft_id: "1389342583871766529",
 };

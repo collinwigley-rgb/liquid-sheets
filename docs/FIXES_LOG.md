@@ -123,3 +123,48 @@ storage) end to end, and confirmed a real board with real team names,
 real dollar values, and correct owner budgets, with no errors beyond a
 pre-existing, unrelated service-worker warning under the local dev
 server.
+
+---
+
+## 2026-09-02 -- Live Sleeper draft sync (issues #5, #6): one mechanism covers keepers too
+
+**Scope:** read-only poll of Sleeper's draft picks, for both the real
+Friday draft (#5) and a Sleeper mock (#6). `app/live_draft.js` mirrors
+FantasyEngine's own `api/lib/live-draft.ts` pattern -- it only ever reads
+Sleeper's state, no write path back, ever. A "Live sync" toggle in the
+board header polls every 5s and appends any pick Sleeper has recorded
+that isn't already on the board as a sale.
+
+**A design choice worth naming:** this ingests every pick Sleeper
+returns, keepers included, since a keeper is just a pick with a real
+dollar amount already spent. That means this one mechanism also covers
+issue #3 (mark kept players unavailable, deduct their real cost from
+budget) -- verified live against the real Money_Talks draft board: all
+11 real keepers landed as sales with their exact real costs, matching
+`sleeper.md`'s table exactly.
+
+**Checked live before trusting it, not assumed from the picks endpoint's
+shape:** Sleeper mock drafts leave `roster_id` null on every pick --
+only the real, league-attached draft populates it directly. Mocks
+identify teams by `draft_slot` instead, translated through the draft
+object's own `slot_to_roster_id` map. `fetchDraftStatus()` now reads
+that map and `fetchDraftPicks()` falls back to it only when `roster_id`
+is null, so the real draft (which always has it) is unaffected either
+way.
+
+**A related mock-draft-specific note, not a bug:** testing this against
+a live mock surfaced that a mock's seat assignments don't correspond to
+real league ownership -- Collin's own keeper (Colston Loveland) landed
+under a different seat number in the mock than his real roster_id (2) in
+the league. That's expected: Sleeper mocks are practice runs with
+independent, often CPU-assigned seating, not a mirror of real team
+ownership. Mocks are a great way to test that the polling/sync mechanism
+itself works end to end (and it does); they're not the way to validate
+real per-team budget outcomes -- that only means something against the
+real draft, where roster_id is always correct.
+
+**Verification:** polled a live Sleeper mock draft end to end and
+confirmed all 12 of its recorded picks (11 keepers + one earlier
+non-keeper pick already on the board) landed correctly as journal sales
+with real dollar amounts, via direct inspection of the saved doc, not
+just the rendered UI.
