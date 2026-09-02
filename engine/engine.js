@@ -112,6 +112,20 @@ export function idpFlexShares(mp) {
   return mp.idp_flex_shares ?? { DL: 1 / 3, LB: 1 / 3, DB: 1 / 3 };
 }
 
+/* Replacement rank (baseline) per position. Prefers REAL measured history
+ * over a formula wherever it exists: mp.measured_baselines (e.g.
+ * {QB:32, RB:39, WR:54, TE:15}) overrides the formulaic superflex-share
+ * calculation for any position it lists, because a league's own real
+ * draft/spend history (FantasyEngine's VOND methodology,
+ * config/vorp_baselines.R -- 1 + the real mean count of players actually
+ * paid above the $1 floor, measured over multiple real seasons) is a
+ * better answer than a plausible-sounding split of the SUPER_FLEX slot.
+ * Corrected 2026-09-02 after comparing this fork's first pass (a guessed
+ * superflex_qb_share formula) against FantasyEngine's real measured
+ * Money_Talks data -- see docs/FIXES_LOG.md. The formula remains the
+ * fallback for any position/league without measured history. IDP baselines
+ * are not computed here at all when mp.idp_pricing is set -- IDP is priced
+ * by valueBoard()'s two-tier fixed pricing instead, not VBD (see there). */
 export function baselines(cfg, mp = cfg.model_params) {
   const slots = cfg.roster_slots;
   const share = mp.baseline_bench_share;
@@ -121,11 +135,14 @@ export function baselines(cfg, mp = cfg.model_params) {
   const flex = slots.FLEX ?? 0;
   const superflex = slots.SUPER_FLEX ?? 0;
   const idpFlex = slots.IDP_FLEX ?? 0;
+  const measured = mp.measured_baselines ?? {};
   const out = {};
   for (const pos of POSITIONS) {
+    if (measured[pos] != null) { out[pos] = measured[pos]; continue; }
     const eff = (slots[pos] ?? 0) + f[pos] * flex + (sf[pos] ?? 0) * superflex;
     out[pos] = Math.max(pyRound(cfg.teams * eff * (1 + share)), 1);
   }
+  if (mp.idp_pricing) return out; // IDP priced separately, no VBD baseline needed
   for (const pos of IDP_POSITIONS) {
     const eff = (slots[pos] ?? 0) + (idpF[pos] ?? 0) * idpFlex;
     out[pos] = Math.max(pyRound(cfg.teams * eff * (1 + share)), 1);
@@ -228,13 +245,24 @@ export function valueBoard(cfg, players, prior, mp = cfg.model_params) {
     nVols[pos] = Math.max(pyRound(cfg.teams * ((cfg.roster_slots[pos] ?? 0) +
       f[pos] * flex + (sf[pos] ?? 0) * superflex)), 1);
   }
-  for (const pos of IDP_POSITIONS) {
-    nVols[pos] = Math.max(pyRound(cfg.teams * ((cfg.roster_slots[pos] ?? 0) +
-      (idpF[pos] ?? 0) * idpFlex)), 1);
+  /* When mp.idp_pricing is set, IDP is priced by fixed tiers below, not
+   * VBD -- no vols baseline needed for it either. */
+  if (!mp.idp_pricing) {
+    for (const pos of IDP_POSITIONS) {
+      nVols[pos] = Math.max(pyRound(cfg.teams * ((cfg.roster_slots[pos] ?? 0) +
+        (idpF[pos] ?? 0) * idpFlex)), 1);
+    }
   }
   const alpha = mp.vols_blend_alpha ?? 0;
 
-  for (const pos of ALL_POSITIONS) {
+  /* IDP is excluded from the VBD/tier loop entirely when priced by fixed
+   * tiers (see below) -- VBD assumes a continuous, roughly linear dollar
+   * relationship between value and price that neither this fork nor
+   * FantasyEngine has validated for IDP production (see docs/FIXES_LOG.md,
+   * 2026-09-02). Skipping the loop leaves p.vbd/p.tier undefined for IDP
+   * players; the fixed-pricing block below sets p.dollar directly instead. */
+  const vbdPositions = mp.idp_pricing ? POSITIONS : ALL_POSITIONS;
+  for (const pos of vbdPositions) {
     const group = ps.filter((p) => p.pos === pos)
       .sort((a, b) => b.proj_pts - a.proj_pts);
     const ptsAt = (rank) =>
@@ -245,13 +273,48 @@ export function valueBoard(cfg, players, prior, mp = cfg.model_params) {
     group.forEach((p, i) => { p.tier = tiers[i]; });
   }
 
-  const premium = cfg.budget * cfg.teams - mp.dollar_slots_per_team * cfg.teams;
+  /* Dollar pool: with mp.idp_pricing set, IDP's real fixed spend is carved
+   * out first (mirrors FantasyEngine's calculate_vorp.R offense_auction_pool
+   * exactly: total cash minus idp_starter_spend minus offense's own $1-floor
+   * reservation), and only the remaining offense-only pool is split by VBD.
+   * Without mp.idp_pricing, falls back to the original single-pool formula
+   * (a league with no IDP at all). */
+  let premium, idpTopN = 0;
+  if (mp.idp_pricing) {
+    const { slots_per_team, top_value, rest_value } = mp.idp_pricing;
+    idpTopN = cfg.teams * slots_per_team;
+    const idpStarterSpend = idpTopN * top_value;
+    const offenseSlotsPerTeam = mp.dollar_slots_per_team - slots_per_team;
+    const offenseMinSpend = cfg.teams * offenseSlotsPerTeam * rest_value;
+    premium = cfg.budget * cfg.teams - idpStarterSpend - offenseMinSpend;
+  } else {
+    premium = cfg.budget * cfg.teams - mp.dollar_slots_per_team * cfg.teams;
+  }
   let totalPosVbd = 0;
-  for (const p of ps) if (p.vbd > 0) totalPosVbd += p.vbd;
   for (const p of ps) {
+    if (IDP_POSITIONS.includes(p.pos) && mp.idp_pricing) continue;
+    if (p.vbd > 0) totalPosVbd += p.vbd;
+  }
+  for (const p of ps) {
+    if (IDP_POSITIONS.includes(p.pos) && mp.idp_pricing) continue; // priced below
     p.dollar = totalPosVbd > 0
       ? Math.max((p.vbd * premium) / totalPosVbd + 1, 1.0)
       : 1.0;
+  }
+
+  /* Fixed two-tier IDP pricing, matching calculate_vorp.R exactly: rank by
+   * raw projected production (not VBD -- there is no IDP replacement
+   * baseline in this mode), top (teams * slots_per_team) get top_value,
+   * everyone else gets rest_value. */
+  if (mp.idp_pricing) {
+    const { top_value, rest_value } = mp.idp_pricing;
+    const idpPlayers = ps.filter((p) => IDP_POSITIONS.includes(p.pos))
+      .sort((a, b) => b.proj_pts - a.proj_pts);
+    idpPlayers.forEach((p, i) => {
+      p.dollar = i < idpTopN ? top_value : rest_value;
+      p.vbd = 0;
+      p.tier = null;
+    });
   }
 
   return {
