@@ -15,15 +15,18 @@ export function picksUrl(draftId) {
 }
 
 /* Returns {status, type, slotToRosterId}. Throws on network failure.
- * slotToRosterId matters for mock drafts specifically: verified directly
- * against a live mock (2026-09-02) that Sleeper leaves `roster_id` null
- * on every pick there (mocks have no real league rosters), and identifies
- * teams by `draft_slot` instead -- the draft object's own
- * `slot_to_roster_id` map is what translates that back to a roster_id
- * (and for a mock, that map may just be the identity 1:1..12:12, but it's
- * not safe to assume that rather than read it). The real draft populates
- * roster_id directly and doesn't need this map, but reading it is
- * harmless there too. */
+ *
+ * Corrected 2026-09-02 (see docs/FIXES_LOG.md): a Sleeper mock draft
+ * leaves `roster_id` null on every pick and reports its own
+ * `slot_to_roster_id` as a meaningless identity map (1:1, 2:2, ... --
+ * verified live, and confirmed wrong by checking a real keeper against
+ * the actual Sleeper mock UI). A mock created "from league settings"
+ * reuses the real league's seating (same `draft_order` -- verified: a
+ * real user sits at the same slot number in the mock as in the real
+ * draft), so the REAL draft's own `slot_to_roster_id` is the map that
+ * actually resolves ownership correctly, for either draft. Callers
+ * should fetch this against the REAL draft_id even when polling a mock's
+ * picks -- see pollDraft's rosterMapDraftId. */
 export async function fetchDraftStatus(draftId) {
   const resp = await fetch(draftUrl(draftId));
   if (!resp.ok) throw new Error(`Sleeper responded ${resp.status}`);
@@ -63,17 +66,24 @@ export async function fetchDraftPicks(draftId, slotToRosterId = {}) {
  * the fetch succeeds (even if unchanged -- the caller decides what's new).
  * A fetch failure calls onError(e) and keeps polling; it does not stop on
  * a single dropped request, since draft night is exactly when a flaky
- * connection matters most. Returns a stop() function. */
-export function pollDraft(draftId, { onPicks, onError, intervalMs = 5000 }) {
+ * connection matters most. Returns a stop() function.
+ *
+ * rosterMapDraftId: which draft's slot_to_roster_id to use for resolving
+ * ownership on picks that lack a direct roster_id (mocks). Defaults to
+ * draftId itself (correct when polling the real draft), but callers
+ * polling a MOCK should pass the real Money_Talks draft_id here instead
+ * -- see fetchDraftStatus's comment for why the mock's own map can't be
+ * trusted for this. */
+export function pollDraft(draftId, { onPicks, onError, intervalMs = 5000,
+  rosterMapDraftId = draftId }) {
   let stopped = false;
   let slotToRosterId = {};
   const tick = async () => {
     if (stopped) return;
     try {
-      /* Re-read the status/slot map every tick, not just once -- cheap,
-       * and avoids trusting a mapping fetched before the draft (or the
-       * mock) was fully set up. */
-      ({ slotToRosterId } = await fetchDraftStatus(draftId));
+      /* Re-read every tick, not just once -- cheap, and avoids trusting a
+       * mapping fetched before the draft was fully set up. */
+      ({ slotToRosterId } = await fetchDraftStatus(rosterMapDraftId));
       const picks = await fetchDraftPicks(draftId, slotToRosterId);
       if (!stopped) onPicks(picks);
     } catch (e) {

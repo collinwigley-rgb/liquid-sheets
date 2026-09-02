@@ -693,6 +693,12 @@ function toggleLiveSync() {
         onPicks: (picks) => { syncDraftPicks(picks); },
         onError: (e) => console.warn("live draft sync: poll failed, will retry", e),
         intervalMs: 5000,
+        /* Always resolve ownership through the REAL draft's slot map, even
+         * when polling a mock -- a mock's own map is a meaningless identity
+         * placeholder (verified live 2026-09-02, see docs/FIXES_LOG.md); the
+         * real draft's map is the one that's actually correct, and a mock
+         * "from league settings" shares the same seating either way. */
+        rosterMapDraftId: doc.league.sleeper_draft_id,
       });
     }
   }
