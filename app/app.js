@@ -1887,8 +1887,14 @@ function stageCopilot(p) {
 /* headshot URL for a Sleeper-sourced player (id "sl:<sleeper_id>"), or null
  * for anyone whose projections came from a manual/non-Sleeper import. */
 function headshotUrl(p) {
-  return p.id.startsWith("sl:")
-    ? `https://sleepercdn.com/content/nfl/players/${p.id.slice(3)}.jpg` : null;
+  /* p.id for a manually pasted/matched import (importers.js) is not
+   * guaranteed to be a clean Sleeper id -- it is whatever string ended up
+   * in that pasted projection file. Interpolating it unescaped into the
+   * src="..." attribute below would let a crafted id break out of the
+   * attribute and inject markup. Requiring digits-only after "sl:" makes
+   * that impossible while matching every real Sleeper id unchanged. */
+  const m = /^sl:(\d+)$/.exec(p.id);
+  return m ? `https://sleepercdn.com/content/nfl/players/${m[1]}.jpg` : null;
 }
 
 /* THE BLOCK: whoever is currently staged/nominated, live. A vertical stack

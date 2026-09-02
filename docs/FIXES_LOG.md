@@ -338,3 +338,23 @@ edits -- had to unregister it manually to see changes; not a bug in the
 change itself, just a wrinkle of iterating locally on an app that
 caches itself for offline use. Bumped V59 -> V60 with the change, per
 the shell-change rule.
+
+---
+
+## 2026-09-02 -- Fixed: XSS in THE BLOCK's headshot URL
+
+Post-push security review flagged `headshotUrl()`: `p.id` is trusted as a
+clean `sl:<sleeper_id>` string, but that field is only guaranteed clean
+for Sleeper-sourced projections. A manually pasted/matched import
+(`importers.js`) can leave `p.id` as whatever string ended up in that
+pasted file, and it was being interpolated unescaped into
+`src="${photo}"` -- a crafted id could break out of the attribute and
+inject markup into the page.
+
+Fixed by requiring the id to match `^sl:(\d+)$` before building the URL;
+anything else now returns `null` (the existing placeholder-box fallback),
+same as a player with no Sleeper id at all. No behavior change for real
+Sleeper data, since every real Sleeper id is already digits-only.
+Verified: the exact URL still resolves for a real id, and a crafted id
+with an embedded `"><script>` now returns `null` instead of building a
+breakout string.
