@@ -215,18 +215,20 @@ header{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;
  * scrolls, the board and rail scroll inside their own columns ---------- */
 #main{display:flex;flex-direction:column;height:calc(100% - 56px);
   overflow-y:auto}
-/* THE BLOCK: the strip showing whoever is currently on the auction block.
- * Sits between the masthead and the board+rail layout; pushes them down
- * only while a player is staged, costs nothing otherwise. Built to grow:
- * #theblock is [.blk-photo, .blk-body], and .blk-body is a vertical flex
- * stack of ".blk-row"s (currently name+heat, then the price scale). Each
- * row wraps on narrow widths instead of clipping, and every widget inside
- * a row (see .blk-track-wrap) is a self-contained box with real CSS
- * height, not an absolutely-positioned element that overflows its own
- * row -- so appending another .blk-row to .blk-body (more stats, whatever
- * comes next) is just that, never a layout fire drill. Target height is
- * ~125px, set by .blk-photo; .blk-body centers vertically alongside it. */
-#theblock{display:none;align-items:stretch;gap:16px;flex-shrink:0;
+/* THE BLOCK: the decision cockpit for whoever is currently on the
+ * auction block -- identity+photo, the verdict/worth/roster-fit/reasons
+ * that used to live in the rail as a separate "THE CALL" panel, and the
+ * price-range scale. Sits between the masthead and the board+rail
+ * layout; pushes them down only while a player is staged, costs nothing
+ * otherwise. Built to grow: #theblock is [.blk-photo, .blk-body], and
+ * .blk-body is a vertical flex stack of ".blk-row"s. Each row wraps on
+ * narrow widths instead of clipping, and every widget inside a row (see
+ * .blk-track-wrap) is a self-contained box with real CSS height, not an
+ * absolutely-positioned element that overflows its own row -- so
+ * appending another .blk-row to .blk-body is just that, never a layout
+ * fire drill. .blk-photo is fixed-size (~105px tall); .blk-body sits
+ * beside it top-aligned and can grow taller than the photo freely. */
+#theblock{display:none;align-items:flex-start;gap:16px;flex-shrink:0;
   padding:10px 20px;border-bottom:2px solid var(--line);background:var(--surface)}
 #theblock.show{display:flex}
 .blk-photo{width:90px;height:105px;flex-shrink:0;border-radius:8px;
@@ -352,11 +354,6 @@ header{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;
 .hit .n{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .hit .d{font-family:var(--mono);font-size:12px;color:var(--gold);font-weight:700}
 .hit.sel,.hit:hover{background:var(--sel)}
-#picked{display:none;margin-top:10px;padding:9px 11px;
-  border:1px solid var(--gold-dim);border-radius:4px;background:var(--picked-bg)}
-#picked .pnm{font-weight:700;font-size:14px}
-#call{display:none;margin-top:8px;padding:10px 12px;border-radius:4px;
-  border:1px solid var(--line);background:var(--surface)}
 .cverdict{display:inline-block;font-size:11px;font-weight:700;
   letter-spacing:.14em;padding:3px 9px;border-radius:3px;text-transform:uppercase}
 .cverdict.target{background:var(--good);color:#fff}
@@ -371,8 +368,8 @@ header{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;
 .cceil{margin-top:3px;font-size:13px;color:var(--muted)}
 .cceil b{font-family:var(--mono);font-size:15px;color:var(--text)}
 .cceil small{color:var(--faint);font-size:11.5px}
-#call ul{margin:7px 0 0;padding-left:16px}
-#call li{font-size:12.5px;color:var(--muted);margin:3px 0;line-height:1.4}
+.blk-reasons{margin:0;padding-left:16px}
+.blk-reasons li{font-size:12.5px;color:var(--muted);margin:3px 0;line-height:1.4}
 #saleform{margin-top:10px}   /* always on screen (V55): price, roster, owners, DRAFT */
 #salegrid{display:grid;grid-template-columns:1fr 25%;gap:10px;margin-top:6px;
   align-items:start}
@@ -882,7 +879,7 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
       <button id="menuSleeper" class="gact">Import Sleeper values</button>
       <button id="menuReset" class="gact gdanger">Clear all sales</button>
       <div class="gdiv"></div>
-      <div class="ver gver">V60</div>
+      <div class="ver gver">V61</div>
     </div>
   </span>
 </header>

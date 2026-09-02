@@ -1688,10 +1688,7 @@ function pick(pid) {
   picked = byId[pid]; selOwner = null; ownerFilter = "";
   hitList = []; renderHits(); $("#q").value = "";
   const p = picked;
-  $("#picked").style.display = "block";
-  $("#picked").innerHTML = `<div class="pnm">${p.name} <span class="${posClass(p.pos)}">${p.pos}</span> <span style="color:var(--faint)">${p.team || ""}</span>${p.inj ? ' <span style="color:var(--bad);font-size:12px">' + p.inj + "</span>" : ""}</div>`;
   $("#price").value = ""; $("#msg").textContent = "";
-  renderCall(p);
   stageCopilot(p);
   stagedId = p.id;
   document.querySelectorAll(".row.staged").forEach((r) =>
@@ -1810,28 +1807,6 @@ function advise(p) {
     elig };
 }
 
-function renderCall(p) {
-  const a = advise(p);
-  const slotRows = a.elig.length
-    ? `<div class="cslots">${a.elig.map((s) =>
-      `<div class="srow"><span class="lab ${posClass(s.lab)}">${s.lab}</span>
-       <span class="pl ${posClass(s.lab)}">~${fmt$(s.eff ?? s.planned)}</span></div>`).join("")}</div>`
-    : (POSITIONS.includes(p.pos) && a.benchOpen > 0 && a.benchPer > 0
-      ? `<div class="cslots"><div class="srow"><span class="lab">BN</span>
-         <span class="pl">~${fmt$(a.benchPer)}</span></div></div>`
-      : "");
-  $("#call").style.display = "block";
-  const ceilLine = a.max < a.worth
-    ? `<div class="cceil">spend up to <b>$${a.max}</b> <small>${a.ceilWhy}</small></div>`
-    : "";
-  $("#call").innerHTML = `<span class="cverdict ${a.cls}">${a.label}</span>
-    <div class="cmax" title="my value for this player: the break-even. Past this you provably overpaid.">worth <b>$${a.worth}</b></div>
-    ${ceilLine}
-    ${a.est ? `<div class="cest">room bids <b>~$${a.est}</b></div>` : ""}
-    ${slotRows}
-    <ul>${a.reasons.slice(0, 5).map((r) => `<li>${r}</li>`).join("")}</ul>`;
-}
-
 /* ---------------- AI live read (self-host only, gated) ----------------
  * The hosted app ships with config.AI_ENDPOINT null, so cp stays null and none
  * of this runs, no #liveread renders, no network call is made. A self-hoster
@@ -1897,54 +1872,49 @@ function headshotUrl(p) {
   return m ? `https://sleepercdn.com/content/nfl/players/${m[1]}.jpg` : null;
 }
 
-/* THE BLOCK: whoever is currently staged/nominated, live. A vertical stack
- * of .blk-rows (see #theblock in index.html for the layout contract) so
- * more can be appended later without redoing the container. Today: a
- * headshot, his tier's price range with target (My$) vs current (live bid)
- * markers, and whether this tier's sales so far are running hot or cold vs
- * their own My$ targets. Reads existing staging state (picked, #price) and
- * the same paid-vs-projected math the board's sold rows already show; adds
- * no new persisted state. */
+/* THE BLOCK: the single decision cockpit for whoever is currently
+ * staged/nominated -- identity+photo, THE CALL's verdict/worth/roster-fit/
+ * reasons (formerly a separate rail panel, now folded in here so there is
+ * one place to look instead of several), and his tier's price range with
+ * target (My$) vs current (live bid) markers plus tier hot/cold. A
+ * vertical stack of .blk-rows (see #theblock in index.html for the layout
+ * contract) so more can be appended later without redoing the container.
+ * Reads existing staging state (picked, #price) and advise()'s existing
+ * verdict logic; adds no new persisted state. */
 function renderBlock() {
   const block = $("#theblock");
   if (!block) return;
-  if (!picked || picked.usd == null) { block.classList.remove("show"); return; }
+  if (!picked) { block.classList.remove("show"); return; }
   const p = picked;
-  const group = P.filter((x) => x.pos === p.pos && x.tier === p.tier
-    && x.usd != null);
-  const vals = group.map((x) => x.usd);
-  let lo = Math.min(...vals), hi = Math.max(...vals);
-  if (lo === hi) { lo -= 1; hi += 1; }
-  const target = Math.round(p.usd);
-  const rawPrice = parseInt($("#price")?.value, 10);
-  const current = rawPrice >= 1 ? rawPrice : null;
-  const pct = (v) => Math.max(0, Math.min(100,
-    ((v - lo) / (hi - lo)) * 100)).toFixed(1);
+  const a = advise(p);
 
-  const soldTier = group.filter((x) => soldSet.has(x.id));
-  const soldPos = soldTier.length ? soldTier
-    : P.filter((x) => x.pos === p.pos && x.usd != null && soldSet.has(x.id));
-  let heat = `<span class="blk-heat" title="no sales yet at this position to compare against">no comps yet</span>`;
-  if (soldPos.length) {
-    const avg = soldPos.reduce((a, x) =>
-      a + (soldBy[x.id].price - x.usd), 0) / soldPos.length;
-    const r = Math.round(avg);
-    const cls = r >= 2 ? "hot" : r <= -2 ? "cold" : "";
-    const lab = r >= 2 ? `TIER RUNNING HOT +$${r}`
-      : r <= -2 ? `TIER RUNNING COLD $${r}` : `TIER STEADY ${r >= 0 ? "+" : ""}$${r}`;
-    heat = `<span class="blk-heat ${cls}" title="${soldPos.length} sold ${p.pos}${soldPos.length === 1 ? "" : "s"}${soldTier.length ? " at this tier" : " (no tier sales yet, using the whole position)"}, averaging $${r >= 0 ? "+" : ""}${r} vs My$">${lab}</span>`;
-  }
-  const photo = headshotUrl(p);
-  block.innerHTML = `
-    ${photo
-      ? `<img class="blk-photo" src="${photo}" alt="" onerror="this.onerror=null;this.removeAttribute('src');this.classList.add('blk-photo-empty')">`
-      : `<div class="blk-photo blk-photo-empty"></div>`}
-    <div class="blk-body">
-      <div class="blk-row">
-        <div class="blk-name">${p.name}<span class="tm">${p.pos} ${p.team || ""}</span>${p.inj ? `<span class="inj">${p.inj}</span>` : ""}</div>
-        ${heat}
-      </div>
-      <div class="blk-row">
+  let scaleRow = "";
+  if (p.usd != null) {
+    const group = P.filter((x) => x.pos === p.pos && x.tier === p.tier
+      && x.usd != null);
+    const vals = group.map((x) => x.usd);
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    if (lo === hi) { lo -= 1; hi += 1; }
+    const target = Math.round(p.usd);
+    const rawPrice = parseInt($("#price")?.value, 10);
+    const current = rawPrice >= 1 ? rawPrice : null;
+    const pct = (v) => Math.max(0, Math.min(100,
+      ((v - lo) / (hi - lo)) * 100)).toFixed(1);
+
+    const soldTier = group.filter((x) => soldSet.has(x.id));
+    const soldPos = soldTier.length ? soldTier
+      : P.filter((x) => x.pos === p.pos && x.usd != null && soldSet.has(x.id));
+    let heat = `<span class="blk-heat" title="no sales yet at this position to compare against">no comps yet</span>`;
+    if (soldPos.length) {
+      const avg = soldPos.reduce((a2, x) =>
+        a2 + (soldBy[x.id].price - x.usd), 0) / soldPos.length;
+      const r = Math.round(avg);
+      const cls = r >= 2 ? "hot" : r <= -2 ? "cold" : "";
+      const lab = r >= 2 ? `TIER RUNNING HOT +$${r}`
+        : r <= -2 ? `TIER RUNNING COLD $${r}` : `TIER STEADY ${r >= 0 ? "+" : ""}$${r}`;
+      heat = `<span class="blk-heat ${cls}" title="${soldPos.length} sold ${p.pos}${soldPos.length === 1 ? "" : "s"}${soldTier.length ? " at this tier" : " (no tier sales yet, using the whole position)"}, averaging $${r >= 0 ? "+" : ""}${r} vs My$">${lab}</span>`;
+    }
+    scaleRow = `<div class="blk-row">
         <div class="blk-scale" title="his tier's My\$ range: $${Math.round(lo)} - $${Math.round(hi)}">
           <span class="blk-endlab">$${Math.round(lo)}</span>
           <div class="blk-track-wrap">
@@ -1956,7 +1926,36 @@ function renderBlock() {
           </div>
           <span class="blk-endlab">$${Math.round(hi)}</span>
         </div>
+        ${heat}
+      </div>`;
+  }
+
+  const ceilLine = a.max < a.worth
+    ? `<div class="cceil">spend up to <b>$${a.max}</b> <small>${a.ceilWhy}</small></div>` : "";
+  const slotRows = a.elig.length
+    ? `<div class="cslots">${a.elig.map((s) =>
+      `<div class="srow"><span class="lab ${posClass(s.lab)}">${s.lab}</span>
+       <span class="pl ${posClass(s.lab)}">~${fmt$(s.eff ?? s.planned)}</span></div>`).join("")}</div>`
+    : (POSITIONS.includes(p.pos) && a.benchOpen > 0 && a.benchPer > 0
+      ? `<div class="cslots"><div class="srow"><span class="lab">BN</span>
+         <span class="pl">~${fmt$(a.benchPer)}</span></div></div>` : "");
+
+  const photo = headshotUrl(p);
+  block.innerHTML = `
+    ${photo
+      ? `<img class="blk-photo" src="${photo}" alt="" onerror="this.onerror=null;this.removeAttribute('src');this.classList.add('blk-photo-empty')">`
+      : `<div class="blk-photo blk-photo-empty"></div>`}
+    <div class="blk-body">
+      <div class="blk-row">
+        <div class="blk-name">${p.name}<span class="tm">${p.pos} ${p.team || ""}</span>${p.inj ? `<span class="inj">${p.inj}</span>` : ""}</div>
+        <span class="cverdict ${a.cls}">${a.label}</span>
+        <div class="cmax" title="my value for this player: the break-even. Past this you provably overpaid.">worth <b>$${a.worth}</b></div>
+        ${ceilLine}
+        ${a.est ? `<div class="cest">room bids <b>~$${a.est}</b></div>` : ""}
       </div>
+      ${slotRows ? `<div class="blk-row">${slotRows}</div>` : ""}
+      ${a.reasons.length ? `<div class="blk-row"><ul class="blk-reasons">${a.reasons.slice(0, 5).map((r) => `<li>${r}</li>`).join("")}</ul></div>` : ""}
+      ${scaleRow}
     </div>`;
   block.classList.add("show");
 }
@@ -1999,7 +1998,7 @@ function resetSale() {
   if (cp) cp.clear();
   document.querySelectorAll(".row.staged").forEach((r) =>
     r.classList.remove("staged"));
-  const ids = ["#picked", "#call", "#summary"];
+  const ids = ["#summary"];
   ids.forEach((i) => { const n = $(i); if (n) n.style.display = "none"; });
   if ($("#hits")) $("#hits").innerHTML = "";
   if ($("#q")) { $("#q").value = ""; $("#q").focus(); }
@@ -2262,8 +2261,6 @@ function renderBoardScreen() {
     <div class="panel">
       <input id="q" placeholder="/Player" autocomplete="off">
       <div id="hits"></div>
-      <div id="picked"></div>
-      <div id="call"></div>
       ${AI_ENABLED ? '<div id="liveread"></div>' : ""}
       <div id="saleform">
         <div class="steplab">price</div>

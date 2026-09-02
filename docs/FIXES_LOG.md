@@ -358,3 +358,59 @@ Sleeper data, since every real Sleeper id is already digits-only.
 Verified: the exact URL still resolves for a real id, and a crafted id
 with an embedded `"><script>` now returns `null` instead of building a
 breakout string.
+
+---
+
+## 2026-09-02 -- THE BLOCK becomes the decision cockpit (merged THE CALL in)
+
+Collin: "I want a better UX representation of ALL the decision points and
+inputs to make an educated decision." Before this, making one bid
+decision meant reading four separate places on screen: THE CALL's
+verdict panel (rail), THE BLOCK's price/tier context (banner), the
+inflation gauge (masthead), and the owner ledger (rail, below the fold).
+
+Folded THE CALL entirely into THE BLOCK rather than duplicating it: the
+old `#call`/`#picked` rail panels are gone, and `renderCall()` no longer
+exists -- its markup (verdict badge, worth $, spend-up-to ceiling, room
+bid estimate, roster-fit slots, reasons list) now renders inside
+`renderBlock()`, using the same unmodified `advise()` logic. The rail
+keeps only the actual controls (search, price entry, owner picker, DRAFT
+button, ledger) -- mechanics, not decision inputs.
+
+Fixed a real gap while merging: THE BLOCK previously hid itself entirely
+for a K/DEF pick (`picked.usd == null` guard), which would have silently
+dropped the verdict/reasons for K/DEF too once `#call` was removed --
+K/DEF has no `usd`/tier (fixed $1 pricing), so it never had a price-scale
+row to show, but it still needs the verdict. Guard now only gates the
+price-scale row, not the whole block; verified live that a DEF pick shows
+verdict + worth + reasons with no photo (no Sleeper id path for
+team defenses) and no price scale, cleanly.
+
+Verified live against the real Money_Talks board: RB pick shows the full
+merged layout (photo, verdict, worth, roster-fit, reasons, price scale
+with heat); DEF pick degrades correctly; Escape still hides the whole
+block; no console errors.
+
+---
+
+## 2026-09-02 -- Fixed: V60 shipped without its service-worker cache bump
+
+Caught while making the change above: V59 -> V60 (the price-bands +
+original THE BLOCK commit) bumped the masthead in `index.html` but never
+bumped `CACHE` in `sw.js`, breaking the exact mechanism the shell-change
+rule exists to protect. Since `sw.js`'s own bytes hadn't changed, a
+browser with an already-registered service worker from before that
+commit would never even detect a new service worker to install --
+`sw.js`'s fetch handler serves same-origin files cache-first with no
+expiry, so anyone who had loaded the app before today would keep getting
+the stale pre-V60 shell indefinitely, silently. A first-time visitor
+(no existing registration) was unaffected -- they'd install fresh and
+get current content regardless of the cache's name.
+
+Fixed by bumping `CACHE` to `liquid-sheets-v61` (paired with the masthead
+going V60 -> V61 for the decision-cockpit merge above), which changes
+`sw.js`'s bytes and forces the update-detect -> install -> activate ->
+delete-old-caches cycle to actually run. Lesson for next time: the
+shell-change rule means bump both files in the SAME commit as the
+triggering change, not just the masthead -- worth double-checking `git
+diff --stat` includes `sw.js` before pushing any shell-affecting commit.
