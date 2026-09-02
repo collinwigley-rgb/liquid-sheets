@@ -127,37 +127,52 @@ consistent with no `DEF` slot in roster_positions; IDP replaces it).
 | 11 | mhauck | Gibb Me My Money | 615985314078748672 |
 | 12 | MoNami21 | (no custom team name) | 1389753365591777280 |
 
-## Keepers (`.keepers` array per roster, `GET /v1/league/.../rosters`)
+## Keepers -- authoritative cost is in the DRAFT, not the roster
 
-Every team but roster 11 (mhauck) has designated exactly 1 keeper (matches
-`max_keepers: 1`). **Important caveat for issue #3:** some rosters carry a
-`p_nick_<player_id>` metadata tag that looks like a dollar cost (e.g.
-`"$26"`) next to their kept player -- this is a Sleeper "player nickname"
-field individual managers set for their own reference, **not a
-Sleeper-guaranteed official keeper-cost field**. Only 5 of 11 keepers have
-one. Treat the tagged values as a strong hint, not ground truth, and do
-not silently assume $0/unknown cost for the other 6 -- that's still a
-real open question for Collin (issue #3's "needs confirmed" keeper-cost
-formula), this data narrows it but doesn't close it.
+`.keepers` on each roster (`GET /v1/league/.../rosters`) only tells you
+*who* is kept. The real keeper **cost** lives as pre-filled `is_keeper:
+true` picks on the actual draft board itself:
 
-| roster_id | Team | Kept player | Cost tag found in Sleeper (informal) |
+```
+GET https://api.sleeper.app/v1/draft/1389342583871766529/picks
+```
+
+Each keeper pick's `metadata.amount` is the real $ cost, already
+deducted from that team's $200 budget for the real draft. Ignore the
+roster `p_nick_<player_id>` metadata entirely for cost purposes -- it's
+an unrelated, informally-set nickname field (only 5 of 11 had one, and
+even those turned out to just coincidentally match, not the source of
+truth). **This table is now complete and authoritative** -- issue #3 no
+longer needs anything further from Collin.
+
+| roster_id | Team | Kept player | Real cost (`metadata.amount`) |
 |---|---|---|---|
 | 1 | LaPorta Potty | Jaxon Smith-Njigba (WR, SEA) | $26 |
 | 2 | Back Akers (Collin) | Colston Loveland (TE, CHI) | $4 |
-| 3 | Pacheckin her out | Jaxson Dart (QB, NYG) | none |
-| 4 | lukelangan | Kyle Pitts (TE, ATL) | none |
+| 3 | Pacheckin her out | Jaxson Dart (QB, NYG) | $3 |
+| 4 | lukelangan | Kyle Pitts (TE, ATL) | $1 |
 | 5 | Jettin' Magic | Romeo Doubs (WR, NE) | $1 |
-| 6 | Blood, Sweat and Beers | Jaylen Waddle (WR, DEN) | none |
-| 7 | Game of Mahomes | George Pickens (WR, DAL) | none |
-| 8 | Peekegbuka | Chris Olave (WR, NO) | none |
-| 9 | Lights Out | Rico Dowdle (RB, PIT) | none |
-| 10 | Skol | Javonte Williams (RB, DAL) | none |
+| 6 | Blood, Sweat and Beers | Jaylen Waddle (WR, DEN) | $7 |
+| 7 | Game of Mahomes | George Pickens (WR, DAL) | $10 |
+| 8 | Peekegbuka | Chris Olave (WR, NO) | $3 |
+| 9 | Lights Out | Rico Dowdle (RB, PIT) | $1 |
+| 10 | Skol | Javonte Williams (RB, DAL) | $1 |
 | 11 | Gibb Me My Money | (none) | -- |
-| 12 | (MoNami21) | Cam Skattebo (RB, NYG) | none |
+| 12 | (MoNami21) | Cam Skattebo (RB, NYG) | $4 |
 
-Re-fetch `GET /v1/league/1389342583871766528/rosters` close to Friday --
-`.keepers` and the `p_nick_*` metadata can still change before the
-deadline.
+For each team, **remaining draft budget = $200 - keeper cost** (or $200
+flat for roster 11, no keeper). This is exactly what issue #3's "deduct
+keeper cost from budget" behavior should compute from.
+
+Note: the same picks endpoint also has one **non-keeper** pick already
+present -- `pick_no 11`, Travis Etienne to roster 11 (mhauck), `is_keeper:
+false`, `amount: "2"`. That looks like a real completed pick already on
+the board (possibly from Collin's mock-draft testing bleeding into this
+data, or an actual pre-draft board seed) -- worth a sanity check with
+Collin rather than assumed to be a second keeper for that team.
+
+Re-fetch the picks endpoint close to Friday -- keeper amounts could
+still be corrected before the deadline.
 
 ## Traded picks (`GET /v1/league/1389342583871766528/traded_picks`)
 
