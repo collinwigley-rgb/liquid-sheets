@@ -24,6 +24,15 @@ Upstream's docs are still useful as architecture reference (the engine,
 the storage/versioning discipline, the verification gates) — just don't
 treat `PRODUCT-SCOPE.md`'s CUT/DEFERRED rows as binding here.
 
+## Real league data — read `sleeper.md` before asking Collin anything
+
+[`sleeper.md`](sleeper.md) holds the actual Money_Talks league data pulled
+live from the Sleeper API: league ID, draft ID, draft time, the real
+roster_positions (superflex + 2 IDP-flex, confirmed), full scoring
+settings, owner/team mapping, and current keepers. Most of what issues
+#1, #2, and part of #3 marked `blocked-on-data` needed is already
+answered there — check it before opening a new question to Collin.
+
 ## Where the actual task list lives
 
 **GitHub Issues on this repo, not this file.** This file describes the
