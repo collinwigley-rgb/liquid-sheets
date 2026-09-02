@@ -464,3 +464,56 @@ into the price field automatically; confirmed across a full poll
 interval that focus stayed wherever the user had clicked (not stolen
 back to `#price`) since the nominee hadn't changed. No console errors.
 Bumped V61 -> V62 with the change.
+
+---
+
+## 2026-09-02 -- Fixed: mock rehearsal was corrupting the real journal; live sync was reading stale Sleeper data
+
+Collin, live, right after V62 shipped: "the current roster and picked
+players is totally messed up." Root cause, found by reading his actual
+saved doc (read-only, via IndexedDB) rather than guessing: `doc.journal`
+had 216 "sale" entries, every one timestamped 2026-09-02, while the real
+Sleeper draft's own status was still `pre_draft` -- meaning every single
+entry was contamination from testing live sync against a mock, not real
+data. `syncDraftPicks()` had no concept of "this poll is a rehearsal" --
+it called `appendSale`/`saveDoc` identically whether polling the real
+draft_id or the "draft/mock ID" override field. Recovery: Collin used
+the existing "Clear all sales" control himself (nothing here needed a
+destructive write from this session).
+
+The actual fix: `toggleLiveSync()` now treats a non-empty "draft/mock ID"
+override as `isMock`, passed through to `syncDraftPicks(picks, isMock)`.
+When true, picks rebuild an ephemeral `mockSales` array (module-level,
+never in `doc.journal`) instead of calling `appendSale`/`saveDoc`;
+`buildModel()`'s `curSales` now reads
+`activeSales(doc.journal.concat(mockSales))` -- concatenating before the
+active-sales filter, not after, so mockSales' negative seq numbers never
+collide with a real unsale's `ref`. Every existing read path (board,
+roster, ledger, THE BLOCK) already consumes `curSales`, so a full mock
+rehearsal now renders live and correctly, and reverts instantly the
+moment live sync stops or points back at the real draft_id -- nothing
+persisted, nothing to clean up after. This is what issue #6 ("Mock draft
+room support for pre-Friday rehearsal") should have guaranteed from the
+start; it never actually isolated the two.
+
+Second, independent bug in the same report ("it's also behind the
+polling, showing Puca when Amon is on the board"): checked Sleeper's own
+response headers and found both endpoints this app polls sit behind a
+CDN serving `stale-while-revalidate=300s` -- a plain `curl` came back
+159 seconds stale. `fetch()`'s `cache` option only controls the
+*browser's* cache, not that CDN edge; confirmed live that only a
+cache-busting query param actually forces a fresh `MISS`. Added
+`noCacheFetch()` in `live_draft.js` (append `?_=Date.now()`, plus
+`cache: "no-store"` for the browser layer too) and use it for both the
+status and picks fetches.
+
+Verified live against a second real mock (draft 1401019314483539968):
+watched the board fully rehearse (roster panel, struck-through picks,
+nomination banner) while confirming via direct IndexedDB read that
+`doc.journal`'s length never moved from its 57-entry baseline throughout
+-- the mock only ever touched the ephemeral overlay. Confirmed via the
+browser's own network log that every poll now carries a unique
+cache-busting param. The remaining few seconds of visible lag against a
+bot-driven mock nominating rapidly is normal 5s-polling granularity, not
+the 159s CDN staleness bug -- a materially different, expected latency.
+No console errors. Bumped V62 -> V63 with the change.

@@ -14,6 +14,20 @@ export function picksUrl(draftId) {
   return `https://api.sleeper.app/v1/draft/${draftId}/picks`;
 }
 
+/* Sleeper's API sits behind a CDN that serves cached responses well past
+ * their own stated freshness window -- verified live 2026-09-02: both
+ * endpoints returned a response already 159s old (Age: 159) under
+ * `cache-control: s-maxage=15..30, stale-while-revalidate=300`, meaning a
+ * client can be reading nomination/pick state that is minutes behind
+ * real life, right when a 30s-nomination-timer auction most needs it
+ * fresh. `cache: "no-store"` only stops the browser's own cache, not the
+ * CDN edge in front of Sleeper -- confirmed a cache-busting query param
+ * is what actually forces a MISS (fresh origin read) past that edge. */
+function noCacheFetch(url) {
+  const bust = url.includes("?") ? "&" : "?";
+  return fetch(`${url}${bust}_=${Date.now()}`, { cache: "no-store" });
+}
+
 /* Returns {status, type, slotToRosterId, nominatedPlayerId, highOffer}.
  * Throws on network failure.
  *
@@ -39,7 +53,7 @@ export function picksUrl(draftId) {
  * Collin: private one-off tool, not redistributed -- using an
  * undocumented-but-observed field here is an accepted tradeoff. */
 export async function fetchDraftStatus(draftId) {
-  const resp = await fetch(draftUrl(draftId));
+  const resp = await noCacheFetch(draftUrl(draftId));
   if (!resp.ok) throw new Error(`Sleeper responded ${resp.status}`);
   const d = await resp.json();
   const m = d.metadata ?? {};
@@ -58,7 +72,7 @@ export async function fetchDraftStatus(draftId) {
  * pick's own roster_id null. Throws on network failure; the caller owns
  * the offline/paused message (same convention as fetchSleeper). */
 export async function fetchDraftPicks(draftId, slotToRosterId = {}) {
-  const resp = await fetch(picksUrl(draftId));
+  const resp = await noCacheFetch(picksUrl(draftId));
   if (!resp.ok) throw new Error(`Sleeper responded ${resp.status}`);
   const picks = await resp.json();
   return picks

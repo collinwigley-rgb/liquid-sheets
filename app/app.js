@@ -23,6 +23,9 @@ let doc = null;
 let liveSyncStop = null;   // stop() from pollDraft(), non-null only while live sync is on
 let liveSyncDraftId = null; // overrides doc.league.sleeper_draft_id when set (testing against a mock)
 let liveNomId = null;      // player id live sync currently believes is nominated, or null
+let mockSales = [];        // ephemeral sale-shaped rows from a MOCK poll, never persisted --
+                            // rebuilt fresh every tick, cleared when live sync stops or
+                            // switches back to the real draft. See syncDraftPicks.
 const $ = (sel) => document.querySelector(sel);
 const el = (tag, cls, text) => {
   const n = document.createElement(tag);
@@ -664,8 +667,30 @@ async function makeRun() {
  * with a real dollar amount, same as any other sale. Dedupes on player id
  * already being an active sale, since a real draft never sells the same
  * player twice -- no extra journal schema needed. Never writes back to
- * Sleeper. */
-async function syncDraftPicks(picks) {
+ * Sleeper.
+ *
+ * isMock (2026-09-02 fix): true whenever the "draft/mock ID" override
+ * field is set, i.e. this poll is a rehearsal, not the real Friday draft.
+ * A rehearsal must NEVER touch doc.journal -- it corrupted the real
+ * saved board once already (216 fake sales from mock testing landed in
+ * the real journal, since nothing used to distinguish the two). Mock
+ * picks instead rebuild the ephemeral mockSales overlay fresh every
+ * tick (see buildModel), which every read path already consumes the
+ * same way it reads doc.journal, so the whole board/roster/ledger
+ * rehearses correctly live and reverts the instant sync stops or points
+ * back at the real draft -- nothing persisted, nothing to clean up. */
+async function syncDraftPicks(picks, isMock) {
+  if (isMock) {
+    mockSales = picks.filter((p) => p.rosterId != null && p.amount != null)
+      .map((p, i) => {
+        const known = byId[p.playerId];
+        return { type: "sale", seq: -1 - i, pid: p.playerId,
+          name: known ? known.name : p.name, pos: known ? known.pos : p.pos,
+          owner: p.rosterId - 1, price: p.amount };
+      });
+    renderBoardScreen();
+    return;
+  }
   const alreadySold = new Set(activeSales(doc.journal).map((s) => s.pid));
   let added = 0;
   for (const p of picks) {
@@ -708,11 +733,15 @@ function syncNomination(nom) {
 function toggleLiveSync() {
   if (liveSyncStop) {
     liveSyncStop(); liveSyncStop = null; liveNomId = null;
+    if (mockSales.length) { mockSales = []; renderBoardScreen(); }
   } else {
-    const draftId = (liveSyncDraftId || "").trim() || doc.league.sleeper_draft_id;
+    const override = (liveSyncDraftId || "").trim();
+    const draftId = override || doc.league.sleeper_draft_id;
+    const isMock = !!override;
+    mockSales = [];
     if (draftId) {
       liveSyncStop = pollDraft(draftId, {
-        onPicks: (picks) => { syncDraftPicks(picks); },
+        onPicks: (picks) => { syncDraftPicks(picks, isMock); },
         onNomination: (nom) => { syncNomination(nom); },
         onError: (e) => console.warn("live draft sync: poll failed, will retry", e),
         intervalMs: 5000,
@@ -1174,7 +1203,10 @@ function buildModel() {
       doc.league.budget);
     saveDoc(doc);
   }
-  curSales = activeSales(doc.journal);
+  /* mockSales (rehearsal-only, never in doc.journal) concat BEFORE
+   * activeSales: their negative seq numbers never collide with a real
+   * unsale's ref, so they always survive the active-sales filter. */
+  curSales = activeSales(doc.journal.concat(mockSales));
   soldSet = new Set(curSales.map((s) => s.pid));
   soldBy = {}; curSales.forEach((s) => { soldBy[s.pid] = s; });
   const mv = doc.market?.values ?? null;
