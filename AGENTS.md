@@ -101,11 +101,16 @@ root, not `app/` alone — the app imports `../engine/engine.js`).
 
 ## Deploy
 
-Upstream auto-deploys `liquid-workflows/liquid-sheets` main to Cloudflare
-Pages. **This fork has no confirmed deploy target yet** — resolving that
-(GitHub Pages, a new Cloudflare Pages project, or something else) is
-tracked as one of the Friday-scope issues. Don't assume pushing to this
-fork's `main` deploys anywhere until that issue is closed.
+**Live at <https://collinwigley-rgb.github.io/liquid-sheets/app/>** —
+GitHub Pages, serving the repo root from `main` (same reason `dev.sh`
+serves the repo root locally: `app.js` imports `../engine/engine.js`, so
+serving `app/` alone 404s the engine). Auto-deploys on every push to
+`main`, usually live within about a minute — check
+`gh api repos/collinwigley-rgb/liquid-sheets/pages/builds/latest` if in
+doubt. Confirmed working end-to-end against the real public URL
+2026-09-02 (quick-start flow, real board, no console errors). Upstream's
+own Cloudflare Pages deploy (`liquid-workflows/liquid-sheets`) is a
+separate, unrelated site — this fork does not touch it.
 
 ## Collaborators
 
