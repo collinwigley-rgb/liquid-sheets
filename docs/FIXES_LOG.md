@@ -269,3 +269,72 @@ in the hover tooltip.
 Verified against real synced sale data from a live mock, not synthetic
 numbers: correct deltas, correct color direction (green = under/deal,
 red = over), tooltips read correctly. Bumped V58 -> V59 with the change.
+
+---
+
+## 2026-09-02 -- Global price bands across position columns
+
+Reviewed DraftKick's auction/draft tool for UX ideas worth adapting (not
+copying -- see `docs/ux-influences-draftkick.md`). Its Positions view
+aligns tier breaks horizontally across every position column at once, so
+you can see what else is available in the same price range at a
+different position -- something the board didn't have, since each
+column's tier line only reflects that position's own value gaps.
+
+Added `p.gtier`: the same `gapTiers()` function already used per-position
+(`engine.js`, unmodified), applied once to the combined pool of all
+rosterable players (usd >= 2) sorted by My$, instead of one position's
+values at a time. `skillCol`'s row loop now marks a second, dashed
+divider (`.g-open`, using the existing `--gold` accent) wherever the
+global tier changes, alongside the existing solid per-position tier line
+(`.t-open`) -- additive, not a replacement; the local tier's own
+semantics, number, and tooltip are untouched.
+
+Trade-off, left as-is for now: bands are dense at the bottom of the board
+(many players a dollar or two apart there means frequent breaks -- the
+same "no single $3-6 step is a cliff, but forty of them are" effect the
+local tiers already show), and most useful at the top, where it matters
+most for a bid decision.
+
+Verified visually against the real Money_Talks board in both dark and
+light themes. `engine.js`'s own logic was not touched (`gapTiers` reused
+unmodified), so no golden-master re-run applies here.
+
+---
+
+## 2026-09-02 -- THE BLOCK: a nomination banner with a live headshot
+
+Collin asked for a full-width banner, visible while a player is
+staged/nominated, to see "the scope of prices" at a glance -- influenced
+by Sleeper's own player card and DraftKick's information density, but
+built on this app's own numbers (My$, tier, hot/cold) rather than raw
+stat cards.
+
+Added `#theblock` between the masthead and the board+rail layout: shown
+only while a player is staged (pushes the layout down; costs nothing
+otherwise). Shows a live headshot from
+`sleepercdn.com/content/nfl/players/<id>.jpg`, keyed off the `sl:<id>`
+ids the app already uses internally (falls back to an empty placeholder
+if a player has no Sleeper id, or the image 404s); his tier's My$ range
+as a horizontal scale with target (My$) and live-bid ticks; and a
+hot/cold heat readout comparing already-sold players at that tier
+(falling back to the whole position when the tier has no sales yet)
+against their own My$ targets, reusing the same paid-vs-projected math
+the sold rows on the board already show.
+
+Built deliberately as a small harness, not a one-off: `#theblock` is
+`[.blk-photo, .blk-body]`, and `.blk-body` is a vertical stack of
+`.blk-row`s, each a self-contained box (no absolutely-positioned content
+that overflows its own row) so more can be stacked in later without
+redoing the layout. Documented inline in `index.html`. Named "THE BLOCK"
+to match the existing "THE CALL" convention.
+
+Verified live against the real Money_Talks board via the local dev
+server: headshot loads with no CORS/hotlink issue, banner shows/hides
+correctly on stage and on Escape, price tick tracks live typing.
+Process note for next time: local testing was initially blocked by the
+app's own service worker serving a stale cached bundle from before these
+edits -- had to unregister it manually to see changes; not a bug in the
+change itself, just a wrinkle of iterating locally on an app that
+caches itself for offline use. Bumped V59 -> V60 with the change, per
+the shell-change rule.

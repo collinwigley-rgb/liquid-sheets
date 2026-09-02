@@ -1,8 +1,8 @@
 /* Liquid Sheets app shell, M1: wizard -> fetch -> engine -> board -> persist.
  * Draft room features arrive in M3/M4; this milestone proves the full pipe. */
 
-import { blendProjections, valueBoard, scoreStatLine, baselines, POSITIONS }
-  from "../engine/engine.js";
+import { blendProjections, valueBoard, scoreStatLine, baselines, POSITIONS,
+  gapTiers } from "../engine/engine.js";
 import { KINDS, parsePaste, guessMapping, toEntries, matchEntries,
   rankImpliedStats, marketScale, detectKind } from "./importers.js";
 import { activeSales, appendSale, appendUnsale, ownerStates,
@@ -1175,6 +1175,14 @@ function buildModel() {
     }
   }
   byId = {}; P.forEach((p) => { byId[p.id] = p; });
+  /* board-wide price bands, alongside (not replacing) each position's own
+   * local tier: My$ is already a cross-position dollar scale (that's the
+   * point of VBD -> dollar conversion), so the same gap-tier rule applies
+   * across the combined pool to answer "what else is in this price band,
+   * at any position" -- see docs/ux-influences-draftkick.md pattern 2. */
+  const theta = doc.league?.model_params?.tier_gap_theta ?? 0.2;
+  const pool = P.filter((p) => (p.usd || 0) >= 2).sort((a, b) => b.usd - a.usd);
+  gapTiers(pool.map((p) => p.usd), theta).forEach((g, i) => { pool[i].gtier = g; });
 }
 
 const dealOf = (p) => (doc.market && p.usd != null && p.y_avg != null)
@@ -1357,13 +1365,16 @@ function skillCol(pos) {
   }
   const above = group.filter((p) => (p.usd || 0) >= 2);
   const free = group.filter((p) => (p.usd || 0) < 2);
-  let lastTier = null;
+  let lastTier = null, lastGTier = null;
   const rowWithTier = (p, target) => {
     addRow(p, target, false);
     if (sortBy !== "deal" && p.tier !== lastTier && lastTier !== null) {
       target.lastChild.classList.add("t-open");
     }
-    lastTier = p.tier;
+    if (sortBy !== "deal" && p.gtier !== lastGTier && lastGTier !== null) {
+      target.lastChild.classList.add("g-open");
+    }
+    lastTier = p.tier; lastGTier = p.gtier;
   };
   above.forEach((p) => rowWithTier(p, wrap));
   col.appendChild(wrap);
@@ -1873,6 +1884,77 @@ function stageCopilot(p) {
   });
 }
 
+/* headshot URL for a Sleeper-sourced player (id "sl:<sleeper_id>"), or null
+ * for anyone whose projections came from a manual/non-Sleeper import. */
+function headshotUrl(p) {
+  return p.id.startsWith("sl:")
+    ? `https://sleepercdn.com/content/nfl/players/${p.id.slice(3)}.jpg` : null;
+}
+
+/* THE BLOCK: whoever is currently staged/nominated, live. A vertical stack
+ * of .blk-rows (see #theblock in index.html for the layout contract) so
+ * more can be appended later without redoing the container. Today: a
+ * headshot, his tier's price range with target (My$) vs current (live bid)
+ * markers, and whether this tier's sales so far are running hot or cold vs
+ * their own My$ targets. Reads existing staging state (picked, #price) and
+ * the same paid-vs-projected math the board's sold rows already show; adds
+ * no new persisted state. */
+function renderBlock() {
+  const block = $("#theblock");
+  if (!block) return;
+  if (!picked || picked.usd == null) { block.classList.remove("show"); return; }
+  const p = picked;
+  const group = P.filter((x) => x.pos === p.pos && x.tier === p.tier
+    && x.usd != null);
+  const vals = group.map((x) => x.usd);
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  if (lo === hi) { lo -= 1; hi += 1; }
+  const target = Math.round(p.usd);
+  const rawPrice = parseInt($("#price")?.value, 10);
+  const current = rawPrice >= 1 ? rawPrice : null;
+  const pct = (v) => Math.max(0, Math.min(100,
+    ((v - lo) / (hi - lo)) * 100)).toFixed(1);
+
+  const soldTier = group.filter((x) => soldSet.has(x.id));
+  const soldPos = soldTier.length ? soldTier
+    : P.filter((x) => x.pos === p.pos && x.usd != null && soldSet.has(x.id));
+  let heat = `<span class="blk-heat" title="no sales yet at this position to compare against">no comps yet</span>`;
+  if (soldPos.length) {
+    const avg = soldPos.reduce((a, x) =>
+      a + (soldBy[x.id].price - x.usd), 0) / soldPos.length;
+    const r = Math.round(avg);
+    const cls = r >= 2 ? "hot" : r <= -2 ? "cold" : "";
+    const lab = r >= 2 ? `TIER RUNNING HOT +$${r}`
+      : r <= -2 ? `TIER RUNNING COLD $${r}` : `TIER STEADY ${r >= 0 ? "+" : ""}$${r}`;
+    heat = `<span class="blk-heat ${cls}" title="${soldPos.length} sold ${p.pos}${soldPos.length === 1 ? "" : "s"}${soldTier.length ? " at this tier" : " (no tier sales yet, using the whole position)"}, averaging $${r >= 0 ? "+" : ""}${r} vs My$">${lab}</span>`;
+  }
+  const photo = headshotUrl(p);
+  block.innerHTML = `
+    ${photo
+      ? `<img class="blk-photo" src="${photo}" alt="" onerror="this.onerror=null;this.removeAttribute('src');this.classList.add('blk-photo-empty')">`
+      : `<div class="blk-photo blk-photo-empty"></div>`}
+    <div class="blk-body">
+      <div class="blk-row">
+        <div class="blk-name">${p.name}<span class="tm">${p.pos} ${p.team || ""}</span>${p.inj ? `<span class="inj">${p.inj}</span>` : ""}</div>
+        ${heat}
+      </div>
+      <div class="blk-row">
+        <div class="blk-scale" title="his tier's My\$ range: $${Math.round(lo)} - $${Math.round(hi)}">
+          <span class="blk-endlab">$${Math.round(lo)}</span>
+          <div class="blk-track-wrap">
+            <div class="blk-track"></div>
+            <div class="blk-mark target" style="left:${pct(target)}%"></div>
+            <span class="blk-marklab" style="left:${pct(target)}%">target $${target}</span>
+            ${current != null ? `<div class="blk-mark current" style="left:${pct(current)}%"></div>
+            <span class="blk-marklab bid" style="left:${pct(current)}%">bid $${current}</span>` : ""}
+          </div>
+          <span class="blk-endlab">$${Math.round(hi)}</span>
+        </div>
+      </div>
+    </div>`;
+  block.classList.add("show");
+}
+
 function selectOwner(oid) {
   selOwner = oid; ownerFilter = "";
   renderOwnerGrid(); updateSummary();
@@ -1880,6 +1962,7 @@ function selectOwner(oid) {
 }
 
 function updateSummary() {
+  renderBlock();
   const ready = picked && selOwner != null
     && parseInt($("#price").value, 10) >= 1;
   $("#sold").disabled = !ready;
@@ -1915,6 +1998,7 @@ function resetSale() {
   if ($("#hits")) $("#hits").innerHTML = "";
   if ($("#q")) { $("#q").value = ""; $("#q").focus(); }
   if ($("#msg")) $("#msg").textContent = "";
+  renderBlock();
 }
 
 async function commit() {
@@ -2148,6 +2232,12 @@ function renderBoardScreen() {
     return;
   }
 
+  /* nomination banner: full width (wider than either column alone), shown
+   * only while a player is staged, pushes the board+rail down rather than
+   * reserving space when nobody's on the block. */
+  const theblock = el("div"); theblock.id = "theblock";
+  root.appendChild(theblock);
+
   const layout = el("div", "layout");
   const boardcol = el("div", "boardcol");
   boardcol.innerHTML = `
@@ -2252,7 +2342,7 @@ function renderBoardScreen() {
   };
 
   renderBoard(); renderTeams(); renderOwners(); renderRoster();
-  renderChips(); renderFavorites(); renderFlow(); applyTab();
+  renderChips(); renderFavorites(); renderFlow(); renderBlock(); applyTab();
   /* appended after renderFlow(), which fully overwrites #flow's innerHTML
    * -- adding this earlier gets silently wiped by that call. */
   if (hf && doc.league.sleeper_draft_id) {
