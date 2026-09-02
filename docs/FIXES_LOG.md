@@ -235,3 +235,20 @@ fix and checked every one against `sleeper.md`'s table directly. All 11
 now resolve to their correct real team (previously only 1 of 11 -- Kyle
 Pitts -- happened to land correctly, apparently by coincidence of the
 identity map lining up for that particular slot).
+
+---
+
+## 2026-09-02 -- My$ range on hover
+
+Collin asked to see a projected cost range, not just the single My$
+point estimate, when a player is on the board. Added a hover tooltip on
+the My$ cell: `My$ range: $45-$61 (+/-15% band around $53)`. The board's
+grid columns are fixed-width and tight across hundreds of rows, so a
+tooltip fits without redesigning the layout -- same pattern the existing
+Bid$/+/- cells already use.
+
+Used FantasyEngine's own auction-value band convention (`BAND_PCT = 0.15`
+in `calculate_vorp.R`) for the spread rather than inventing a different
+one, so the two projects describe uncertainty around a value the same
+way. Bumped V57 -> V58 (masthead + service-worker cache) with the change,
+per the shell-change rule.
