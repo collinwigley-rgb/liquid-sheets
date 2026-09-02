@@ -17,6 +17,8 @@
  */
 
 export const POSITIONS = ["QB", "RB", "WR", "TE"];
+export const IDP_POSITIONS = ["DL", "LB", "DB"];
+export const ALL_POSITIONS = [...POSITIONS, ...IDP_POSITIONS];
 
 export function pyRound(x) {
   const f = Math.floor(x);
@@ -40,6 +42,7 @@ export function round1(x) {
 }
 
 export function scoreStatLine(pos, st, scoring) {
+  if (IDP_POSITIONS.includes(pos)) return scoreIdpStatLine(st, scoring.idp);
   const g = (k) => st[k] ?? 0;
   const p = scoring.pass ?? {};
   const r = scoring.rush ?? {};
@@ -56,20 +59,75 @@ export function scoreStatLine(pos, st, scoring) {
   return Math.max(pts, 0);
 }
 
+/* IDP scoring (DL/LB/DB) -- a wholly separate stat vocabulary from
+ * offense, so it gets its own scorer rather than overloading the offense
+ * one. scoring.idp keys mirror Sleeper's own idp_* scoring_settings names
+ * (see sleeper.md) so a league's raw Sleeper scoring config can be passed
+ * through close to verbatim. */
+export function scoreIdpStatLine(st, idp = {}) {
+  const g = (k) => st[k] ?? 0;
+  let pts = 0;
+  pts += g("tkl_solo") * (idp.tkl_solo ?? 0);
+  pts += g("tkl_ast") * (idp.tkl_ast ?? 0);
+  pts += g("tkl_loss") * (idp.tkl_loss ?? 0);
+  pts += g("sacks") * (idp.sack ?? 0);
+  pts += g("qb_hits") * (idp.qb_hit ?? 0);
+  pts += g("def_ints") * (idp.int ?? 0);
+  pts += g("int_ret_yds") * (idp.int_ret_yd ?? 0);
+  pts += g("forced_fumbles") * (idp.ff ?? 0);
+  pts += g("fum_rec") * (idp.fum_rec ?? 0);
+  pts += g("fum_ret_yds") * (idp.fum_ret_yd ?? 0);
+  pts += g("pass_def") * (idp.pass_def ?? 0);
+  pts += g("blocked_kicks") * (idp.blk_kick ?? 0);
+  pts += g("safeties") * (idp.safe ?? 0);
+  pts += g("def_tds") * (idp.def_td ?? 0);
+  return Math.max(pts, 0);
+}
+
 export function flexShares(slots) {
   const fRb = Math.min(0.25 + (slots.WR - slots.RB) / 3.0, 0.8);
   const fTe = slots.TE === 0 && (slots.FLEX ?? 0) > 0 ? 0.4 : 0.1;
   return { RB: fRb, TE: fTe, WR: 1.0 - fRb - fTe, QB: 0.0 };
 }
 
+/* SUPER_FLEX is eligible for QB/RB/WR/TE. In a 1-QB-start league the slot
+ * goes to a 2nd/3rd QB far more often than a skill player -- backup QBs
+ * clear replacement-level RB/WR/TE by enough margin that this is the
+ * dominant real-draft pattern, not just a guess, but there is no
+ * league-specific measured history to pin the exact split the way
+ * FantasyEngine's vorp_baselines.R does for offense. superflex_qb_share is
+ * therefore a labeled, overridable model param rather than a silent
+ * hardcode (this repo's own ADR-0011: no unlabeled strategy opinions) --
+ * default 0.6, override via cfg.model_params.superflex_qb_share. */
+export function superFlexShares(mp) {
+  const qbShare = mp.superflex_qb_share ?? 0.6;
+  const rest = (1 - qbShare) / 3;
+  return { QB: qbShare, RB: rest, WR: rest, TE: rest };
+}
+
+/* IDP_FLEX is eligible for any IDP position (DL/LB/DB). No measured split
+ * exists for this league either -- defaults to an even split, override via
+ * cfg.model_params.idp_flex_shares. */
+export function idpFlexShares(mp) {
+  return mp.idp_flex_shares ?? { DL: 1 / 3, LB: 1 / 3, DB: 1 / 3 };
+}
+
 export function baselines(cfg, mp = cfg.model_params) {
   const slots = cfg.roster_slots;
   const share = mp.baseline_bench_share;
   const f = flexShares(slots);
+  const sf = superFlexShares(mp);
+  const idpF = idpFlexShares(mp);
   const flex = slots.FLEX ?? 0;
+  const superflex = slots.SUPER_FLEX ?? 0;
+  const idpFlex = slots.IDP_FLEX ?? 0;
   const out = {};
   for (const pos of POSITIONS) {
-    const eff = (slots[pos] ?? 0) + f[pos] * flex;
+    const eff = (slots[pos] ?? 0) + f[pos] * flex + (sf[pos] ?? 0) * superflex;
+    out[pos] = Math.max(pyRound(cfg.teams * eff * (1 + share)), 1);
+  }
+  for (const pos of IDP_POSITIONS) {
+    const eff = (slots[pos] ?? 0) + (idpF[pos] ?? 0) * idpFlex;
     out[pos] = Math.max(pyRound(cfg.teams * eff * (1 + share)), 1);
   }
   return out;
@@ -145,7 +203,11 @@ export function valueBoard(cfg, players, prior, mp = cfg.model_params) {
     ...p, raw_pts: scoreStatLine(p.pos, p.stats, cfg.scoring),
   }));
 
-  for (const pos of POSITIONS) {
+  /* IDP has no per-rank games-missed prior (unlike offense's `prior`
+   * table) -- priorMap.get() falls through to 0 for DL/LB/DB, i.e. no
+   * availability discount applied to IDP. Reasonable default until a
+   * real IDP prior exists; not a silent gap since it's documented here. */
+  for (const pos of ALL_POSITIONS) {
     const group = ps.filter((p) => p.pos === pos)
       .sort((a, b) => b.raw_pts - a.raw_pts);
     group.forEach((p, i) => {
@@ -156,15 +218,23 @@ export function valueBoard(cfg, players, prior, mp = cfg.model_params) {
 
   const nBase = baselines(cfg, mp);
   const f = flexShares(cfg.roster_slots);
+  const sf = superFlexShares(mp);
+  const idpF = idpFlexShares(mp);
   const flex = cfg.roster_slots.FLEX ?? 0;
+  const superflex = cfg.roster_slots.SUPER_FLEX ?? 0;
+  const idpFlex = cfg.roster_slots.IDP_FLEX ?? 0;
   const nVols = {};
   for (const pos of POSITIONS) {
-    nVols[pos] = Math.max(
-      pyRound(cfg.teams * ((cfg.roster_slots[pos] ?? 0) + f[pos] * flex)), 1);
+    nVols[pos] = Math.max(pyRound(cfg.teams * ((cfg.roster_slots[pos] ?? 0) +
+      f[pos] * flex + (sf[pos] ?? 0) * superflex)), 1);
+  }
+  for (const pos of IDP_POSITIONS) {
+    nVols[pos] = Math.max(pyRound(cfg.teams * ((cfg.roster_slots[pos] ?? 0) +
+      (idpF[pos] ?? 0) * idpFlex)), 1);
   }
   const alpha = mp.vols_blend_alpha ?? 0;
 
-  for (const pos of POSITIONS) {
+  for (const pos of ALL_POSITIONS) {
     const group = ps.filter((p) => p.pos === pos)
       .sort((a, b) => b.proj_pts - a.proj_pts);
     const ptsAt = (rank) =>
