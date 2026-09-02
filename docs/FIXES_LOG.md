@@ -252,3 +252,20 @@ in `calculate_vorp.R`) for the spread rather than inventing a different
 one, so the two projects describe uncertainty around a value the same
 way. Bumped V57 -> V58 (masthead + service-worker cache) with the change,
 per the shell-change rule.
+
+---
+
+## 2026-09-02 -- Flag actual sale price vs projected My$
+
+Collin asked: when a price is made, flag whether it landed above or
+below the projected price, and by how much. Once a player is sold, the
+existing +/- column (previously "deal vs the market," which stops being
+the live question once a player is off the board) switches to "actual
+price vs projected My$" -- e.g. `-21` in green for $21 under projection
+(a deal), `+44` in red for $44 over. The usd cell switches from the
+pre-sale My$ estimate to the real price paid, with the projection kept
+in the hover tooltip.
+
+Verified against real synced sale data from a live mock, not synthetic
+numbers: correct deltas, correct color direction (green = under/deal,
+red = over), tooltips read correctly. Bumped V58 -> V59 with the change.
