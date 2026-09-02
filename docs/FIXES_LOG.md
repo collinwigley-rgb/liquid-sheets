@@ -67,3 +67,59 @@ idp_pricing: { slots_per_team: 2, top_value: 3, rest_value: 1 }
 **Verification:** with the config above, the top 24 IDP players by raw
 projected production receive exactly $3, and the 25th and beyond receive
 exactly $1 (checked directly against a synthetic 180-player IDP pool).
+
+---
+
+## 2026-09-02 -- Real Sleeper scoring/IDP data wired in; two issues found by testing live in a browser
+
+**Scope:** issues #2 (pull league scoring from Sleeper) and #4 (re-score
+projections under Money_Talks' scoring). `scripts/generate_money_talks_config.mjs`
+pulls the real league config from the Sleeper API and writes
+`app/money_talks_config.js`; a "Quick start: Money_Talks" button loads it
+directly, skipping the generic wizard (which has no UI for
+superflex/IDP at all). `app/sleeper.js` now fetches DL/LB/DB projections
+alongside offense.
+
+**Checked before wiring anything up, not assumed:**
+- The generator's first pass wrote Sleeper's raw scoring weights straight
+  into the config, including float32 storage noise (`0.03999999910593033`
+  instead of `0.04`). Caught by reading the generated file before using
+  it -- rounded to 4 decimals.
+- `pass_2pt`/`rush_2pt`/`rec_2pt` all happen to be `2` in this league,
+  which the engine's single `two_pt` stat can only represent correctly
+  because they agree. Added an explicit check that throws if they ever
+  diverge, instead of silently picking one and hoping.
+- `scoreIdpStatLine`'s stat-key names (added in the first IDP pass) had
+  never actually been checked against Sleeper's real projection field
+  names. A live pull turned up two real gaps: `player.position` is the
+  raw NFL position (DT/DE/CB/SS/...), not the DL/LB/DB fantasy bucket
+  used for roster eligibility -- that only exists in
+  `player.fantasy_positions`; and the existing `pts_half_ppr` inclusion
+  gate would have silently dropped about a third of real IDP
+  projections, since standard PPR scoring doesn't award IDP stats at
+  all. Both fixed in `app/sleeper.js` (bucket comes from
+  `fantasy_positions`; IDP inclusion gates on having any real idp_* stat
+  instead).
+- Sleeper's IDP projections only ever populate 8 of the 14 idp_* stat
+  categories Money_Talks' scoring actually uses (no tackles-for-loss, QB
+  hits, return yards, pass-defenses, or defensive TDs). Not a bug --
+  verified directly against a live pull -- and the same kind of gap
+  FantasyEngine's own IDP pipeline already documents for its data
+  source. IDP dollar values are therefore real but necessarily
+  incomplete on those categories; noted in `app/sleeper.js` rather than
+  left implicit.
+
+**Found by testing the actual quick-start flow in a browser, not by
+reading the code:** the first working version crashed on load with
+`team_names` left empty -- code elsewhere assumes `team_names.length`
+matches the real team count and reads a per-owner roster shape off each
+entry, which broke for the unfilled slots. Fixed by having the generator
+pull Money_Talks' real 12 team names from Sleeper (same source as
+`sleeper.md`) instead of leaving them blank.
+
+**Verification:** ran the real generator against the live Sleeper API,
+loaded the quick-start flow in a clean browser session (fresh tab, fresh
+storage) end to end, and confirmed a real board with real team names,
+real dollar values, and correct owner budgets, with no errors beyond a
+pre-existing, unrelated service-worker warning under the local dev
+server.
