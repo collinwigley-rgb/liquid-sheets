@@ -414,3 +414,53 @@ delete-old-caches cycle to actually run. Lesson for next time: the
 shell-change rule means bump both files in the SAME commit as the
 triggering change, not just the masthead -- worth double-checking `git
 diff --stat` includes `sw.js` before pushing any shell-affecting commit.
+
+---
+
+## 2026-09-02 -- THE BLOCK now auto-stages from live sync (undocumented Sleeper field)
+
+Collin, live: "THE BLOCK is not showing up during a live draft." Root
+cause: THE BLOCK only ever renders for whoever `pick()` has staged, and
+live sync (`syncDraftPicks`, built well before today under #5/#6) only
+ever calls `appendSale` for a *completed* pick -- it never staged anyone.
+That's because `fetchDraftPicks` filters out any pick without a
+`player_id`, and the code's own comment already suspected why: "a pick
+can be null while a nomination is mid-bid."
+
+Verified live against Collin's actual running mock (draft
+1400887695084953600) rather than guessing: fetched
+`/v1/draft/<id>/picks` mid-nomination and confirmed zero null-`player_id`
+rows exist at all -- the current nomination is completely invisible in
+that feed, matching-or-worse than the old comment assumed. Then checked
+`/v1/draft/<id>` (the status endpoint `fetchDraftStatus` already calls
+for `slot_to_roster_id`) and found it: `metadata.nominated_player_id` and
+`metadata.highest_offer` are live, current, and exactly what's needed.
+Not in Sleeper's public API docs -- found by inspecting a real response
+during an actual live nomination. Collin approved using it anyway: this
+is a private one-off tool, never redistributed, read-only.
+
+`fetchDraftStatus` now also returns `nominatedPlayerId`/`highOffer`.
+`pollDraft` computes the nomination from `draftId` itself (never
+`rosterMapDraftId` -- a mock's own live nomination is what's live when
+watching a mock, unlike its untrustworthy roster map), cross-checked
+against `picks` so metadata left over from a just-completed sale doesn't
+re-surface an already-sold player as still nominated. New
+`onNomination(nom)` callback fires every tick with `{playerId, highOffer}`
+or `null`.
+
+`app.js`'s new `syncNomination()` stages the nominee via the existing
+`pick()` only when it actually changes (never re-stages the same
+nominee every 5s tick -- that would have stolen focus from `#price` on
+every poll, breaking anyone mid-interaction) and live-updates the price
+field with `highOffer` while that nominee remains staged. Only
+auto-clears staging when the specific player live sync itself staged
+is the one leaving the block -- never a player staged manually for
+research between nominations.
+
+Verified live end-to-end against the real running mock: THE BLOCK
+correctly showed the actual live nominee (Zay Flowers, WR, injury flag,
+verdict, roster-fit, reasons, tier heat) with the real $24 offer synced
+into the price field automatically; confirmed across a full poll
+interval that focus stayed wherever the user had clicked (not stolen
+back to `#price`) since the nominee hadn't changed. No console errors.
+Bumped V61 -> V62 with the change.

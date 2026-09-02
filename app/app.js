@@ -22,6 +22,7 @@ import { pollDraft } from "./live_draft.js";
 let doc = null;
 let liveSyncStop = null;   // stop() from pollDraft(), non-null only while live sync is on
 let liveSyncDraftId = null; // overrides doc.league.sleeper_draft_id when set (testing against a mock)
+let liveNomId = null;      // player id live sync currently believes is nominated, or null
 const $ = (sel) => document.querySelector(sel);
 const el = (tag, cls, text) => {
   const n = document.createElement(tag);
@@ -683,14 +684,36 @@ async function syncDraftPicks(picks) {
   if (added) { await saveDoc(doc); renderBoardScreen(); }
 }
 
+/* Stages/updates THE BLOCK from live sync's onNomination -- see
+ * pollDraft's doc comment in live_draft.js for what's actually being read
+ * (an undocumented metadata field Sleeper's own live UI uses internally).
+ * Only touches staging when the live-nominated player actually changes,
+ * so this never steals focus or resets selOwner on every 5s tick; only
+ * auto-clears staging on liveNomId's own transition to null/other, never
+ * a player the user staged manually for research between nominations. */
+function syncNomination(nom) {
+  const prevNomId = liveNomId;
+  const validId = nom && byId[nom.playerId] ? nom.playerId : null;
+  if (validId !== prevNomId) {
+    liveNomId = validId;
+    if (validId) pick(validId);
+    else if (stagedId === prevNomId) resetSale();
+  }
+  if (validId && stagedId === validId && nom.highOffer != null) {
+    $("#price").value = nom.highOffer;
+    updateSummary();
+  }
+}
+
 function toggleLiveSync() {
   if (liveSyncStop) {
-    liveSyncStop(); liveSyncStop = null;
+    liveSyncStop(); liveSyncStop = null; liveNomId = null;
   } else {
     const draftId = (liveSyncDraftId || "").trim() || doc.league.sleeper_draft_id;
     if (draftId) {
       liveSyncStop = pollDraft(draftId, {
         onPicks: (picks) => { syncDraftPicks(picks); },
+        onNomination: (nom) => { syncNomination(nom); },
         onError: (e) => console.warn("live draft sync: poll failed, will retry", e),
         intervalMs: 5000,
         /* Always resolve ownership through the REAL draft's slot map, even

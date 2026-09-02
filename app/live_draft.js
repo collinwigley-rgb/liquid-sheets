@@ -14,7 +14,8 @@ export function picksUrl(draftId) {
   return `https://api.sleeper.app/v1/draft/${draftId}/picks`;
 }
 
-/* Returns {status, type, slotToRosterId}. Throws on network failure.
+/* Returns {status, type, slotToRosterId, nominatedPlayerId, highOffer}.
+ * Throws on network failure.
  *
  * Corrected 2026-09-02 (see docs/FIXES_LOG.md): a Sleeper mock draft
  * leaves `roster_id` null on every pick and reports its own
@@ -26,12 +27,25 @@ export function picksUrl(draftId) {
  * draft), so the REAL draft's own `slot_to_roster_id` is the map that
  * actually resolves ownership correctly, for either draft. Callers
  * should fetch this against the REAL draft_id even when polling a mock's
- * picks -- see pollDraft's rosterMapDraftId. */
+ * picks -- see pollDraft's rosterMapDraftId.
+ *
+ * Undocumented, verified live 2026-09-02 against an active mock
+ * (draft 1400887695084953600): while a player is nominated and being
+ * bid on, that pick never appears in /picks at all (confirmed zero
+ * null-player_id rows in a real response) -- the ONLY place the current
+ * nomination shows up is this endpoint's own `metadata.nominated_player_id`
+ * / `metadata.highest_offer`. Not in Sleeper's public API docs; this is
+ * exactly why THE BLOCK never showed during live sync before this fix.
+ * Collin: private one-off tool, not redistributed -- using an
+ * undocumented-but-observed field here is an accepted tradeoff. */
 export async function fetchDraftStatus(draftId) {
   const resp = await fetch(draftUrl(draftId));
   if (!resp.ok) throw new Error(`Sleeper responded ${resp.status}`);
   const d = await resp.json();
-  return { status: d.status, type: d.type, slotToRosterId: d.slot_to_roster_id ?? {} };
+  const m = d.metadata ?? {};
+  return { status: d.status, type: d.type, slotToRosterId: d.slot_to_roster_id ?? {},
+    nominatedPlayerId: m.nominated_player_id || null,
+    highOffer: m.highest_offer != null ? Number(m.highest_offer) : null };
 }
 
 /* Returns every pick Sleeper has recorded so far, oldest first, each as
@@ -73,19 +87,38 @@ export async function fetchDraftPicks(draftId, slotToRosterId = {}) {
  * draftId itself (correct when polling the real draft), but callers
  * polling a MOCK should pass the real Money_Talks draft_id here instead
  * -- see fetchDraftStatus's comment for why the mock's own map can't be
- * trusted for this. */
-export function pollDraft(draftId, { onPicks, onError, intervalMs = 5000,
-  rosterMapDraftId = draftId }) {
+ * trusted for this.
+ *
+ * onNomination(nom): optional. Called each tick with either
+ * {playerId, highOffer} for whoever is currently nominated/being bid on
+ * (playerId as "sl:<id>", matching every other id in this app), or null
+ * when nobody is actively nominated. Nomination metadata always comes
+ * from draftId itself (the draft actually being watched), never
+ * rosterMapDraftId -- a mock's own nomination is what's live when
+ * watching a mock, even though its roster map is untrustworthy (see
+ * fetchDraftStatus). Cross-checked against picks so stale metadata left
+ * over after a sale completes doesn't re-surface an already-sold
+ * player. */
+export function pollDraft(draftId, { onPicks, onError, onNomination,
+  intervalMs = 5000, rosterMapDraftId = draftId }) {
   let stopped = false;
-  let slotToRosterId = {};
   const tick = async () => {
     if (stopped) return;
     try {
       /* Re-read every tick, not just once -- cheap, and avoids trusting a
        * mapping fetched before the draft was fully set up. */
-      ({ slotToRosterId } = await fetchDraftStatus(rosterMapDraftId));
+      const draftStatus = await fetchDraftStatus(draftId);
+      const { slotToRosterId } = rosterMapDraftId === draftId
+        ? draftStatus : await fetchDraftStatus(rosterMapDraftId);
       const picks = await fetchDraftPicks(draftId, slotToRosterId);
       if (!stopped) onPicks(picks);
+      if (!stopped && onNomination) {
+        const nomId = draftStatus.nominatedPlayerId;
+        const playerId = nomId ? `sl:${nomId}` : null;
+        const alreadySold = playerId && picks.some((p) => p.playerId === playerId);
+        onNomination(playerId && !alreadySold
+          ? { playerId, highOffer: draftStatus.highOffer } : null);
+      }
     } catch (e) {
       if (!stopped && onError) onError(e);
     }
