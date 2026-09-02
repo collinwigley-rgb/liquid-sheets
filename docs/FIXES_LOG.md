@@ -9,7 +9,7 @@ supersedes it and say so.
 
 ---
 
-## 2026-09-02 -- Superflex/IDP pricing switched to FantasyEngine's measured methodology
+## 2026-09-02 -- Superflex/IDP pricing: evaluated two methods, blended them
 
 **Starting point (commit e5c133a, issue #1):** engine.js added
 `superFlexShares()` (a formulaic 60/40 QB/skill-position split for the
@@ -17,9 +17,10 @@ SUPER_FLEX slot) and continuous IDP VBD (`scoreIdpStatLine` +
 `idpFlexShares()`, an even 1/3 DL/LB/DB split) so the engine could price
 a superflex + 2-IDP-flex roster at all.
 
-**Change:** FantasyEngine runs its own separate valuation pipeline for
-this same league (`config/vorp_baselines.R`, `scripts/calculate_vorp.R`),
-and it already has two things this fork's formulaic approach didn't:
+**Evaluation:** two valuation approaches exist for this league --
+engine.js's general formula (above), and FantasyEngine's separate
+pipeline for this same league (`config/vorp_baselines.R`,
+`scripts/calculate_vorp.R`). Comparing them:
 
 1. **Offense baselines (QB/RB/WR/TE):** `config/vorp_baselines.R` has
    Money_Talks' replacement ranks measured directly from 3 real seasons
@@ -35,8 +36,9 @@ and it already has two things this fork's formulaic approach didn't:
    separately via a smash-score composite grounded in its own correlation
    analysis (`calculate_idp_smash_tiers.R`).
 
-**Change made:** engine.js now supports both, as opt-in config rather
-than a rewrite of the formulaic path:
+**Determination:** blend the two rather than replace one with the other --
+use measured history where it exists, keep the general formula as a
+fallback where it doesn't. engine.js now supports both as opt-in config:
 - `baselines()` accepts `mp.measured_baselines` (e.g.
   `{QB:32, RB:39, WR:54, TE:15}`) and uses it directly per position when
   present. The formula remains the default for any league/position
