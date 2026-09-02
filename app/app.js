@@ -16,6 +16,7 @@ import { loadDoc, saveDoc, wipeDoc, newDoc, exportDoc, importDocFile,
 import { fetchSleeper } from "./sleeper.js";
 import { myPlanState, planFit, defaultPlan } from "./plan.js";
 import { AI_ENABLED, AI_ENDPOINT } from "./config.js";
+import { MONEY_TALKS_LEAGUE } from "./money_talks_config.js";
 
 let doc = null;
 const $ = (sel) => document.querySelector(sel);
@@ -279,8 +280,40 @@ function numInput(labelText, value, min, max, onchange, { locked = "" } = {}) {
   return wrap;
 }
 
+/* Quick start: loads Money_Talks' real, pre-generated league config
+ * (roster shape incl. SUPER_FLEX/2x IDP_FLEX, real Sleeper scoring,
+ * measured offense baselines, real IDP pricing -- see
+ * scripts/generate_money_talks_config.mjs and docs/FIXES_LOG.md) and
+ * skips straight past the wizard, since the generic wizard has no UI for
+ * superflex/IDP roster slots or IDP scoring at all. This is a one-off
+ * button for this specific fork's one-and-done deployment, not a general
+ * quick-start mechanism -- see AGENTS.md. */
+async function loadMoneyTalksQuickStart() {
+  if (!doc) doc = newDoc();
+  pendingNewFrom = null;
+  doc.league = { ...MONEY_TALKS_LEAGUE };
+  await saveDoc(doc);
+  wizardState.resumeAt = null;
+  try {
+    await doFetchSleeper();
+  } catch (e) {
+    console.warn("Money_Talks quick start: initial Sleeper fetch failed", e);
+  }
+  renderBoardScreen();
+}
+
 function stepLeague(body, nav) {
   body.appendChild(el("h2", null, "League shape"));
+  if (!wizardState.editing) {
+    const quick = el("div", "quickstart");
+    const b = el("button", "ghost", "Quick start: Money_Talks (real league)");
+    b.onclick = () => { loadMoneyTalksQuickStart(); };
+    quick.appendChild(b);
+    quick.appendChild(el("p", "hint",
+      "Loads Money_Talks' real Sleeper scoring, roster (superflex + 2 IDP-flex), " +
+      "and measured baselines directly -- skips this wizard entirely."));
+    body.appendChild(quick);
+  }
   const nameWrap = el("label", "field");
   nameWrap.appendChild(el("span", null, "League name"));
   const nameInp = el("input");
