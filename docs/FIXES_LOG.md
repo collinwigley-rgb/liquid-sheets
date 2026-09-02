@@ -168,3 +168,40 @@ confirmed all 12 of its recorded picks (11 keepers + one earlier
 non-keeper pick already on the board) landed correctly as journal sales
 with real dollar amounts, via direct inspection of the saved doc, not
 just the rendered UI.
+
+---
+
+## 2026-09-02 -- Live sync UI needs a way to point at a mock; two deploy issues caught testing the real site
+
+**Draft-ID override:** the live-sync toggle only ever pointed at the real
+draft (hardcoded in `money_talks_config.js`) -- testing against a mock
+meant editing that file and reverting it. Added an input next to the
+toggle: blank uses the real Money_Talks draft, filled in points sync at
+any other draft_id for rehearsal, no code edit needed.
+
+**A stale service worker hid every change made this session from the
+live deployed site.** `RUNBOOK.md` has an explicit rule: any shell
+change bumps the masthead version and the service-worker cache name
+together, since a stale service worker is the number-one source of "my
+change did not show up." This session's changes never did that. It went
+unnoticed until testing the real deployed GitHub Pages URL directly: the
+GitHub Pages build and CDN were both serving the latest code, but a
+browser that had visited the site earlier in the session kept running
+the old cached shell regardless, because the already-installed service
+worker doesn't re-check its own script for changes on every visit. Fixed
+by bumping V55 -> V56 (masthead + cache name together, matching the
+rule). This only affects browsers that visited the site during the
+stale window -- a device visiting for the first time gets the current
+code from a clean install.
+
+**Verification:** with the version bump live and confirmed on the CDN,
+ran the full quick-start + live-sync flow against a live Sleeper mock
+end to end on a clean origin (no prior service-worker history). Caught a
+real pick (Jahmyr Gibbs, $80) happen live in the mock during the test
+and watched it sync onto the board automatically within one 5-second
+poll -- correct player, correct price, correct owner, board totals and
+inflation recalculated correctly. Also reconfirmed the mock-seating
+caveat from the previous entry using real data: Jaxon Smith-Njigba's
+keeper landed under a different owner in this mock than his real
+roster_id 1 (LaPorta Potty) in the league -- expected mock behavior, not
+a defect, and does not affect the real draft.
