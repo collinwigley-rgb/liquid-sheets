@@ -1042,6 +1042,14 @@ let lastEsc = 0;                               // double-tap Escape timer
 let cp = null;   // copilot handle, non-null only when config.AI_ENDPOINT is set
 
 const fmt$ = (v) => v == null ? "" : "$" + Math.round(v);
+/* My$ shown on the board is a single point estimate; this surfaces a range
+ * around it on hover so a bidder isn't anchored on a false-precision number.
+ * +/-15% flat band, matching FantasyEngine's own auction-value convention
+ * exactly (scripts/calculate_vorp.R, BAND_PCT) for consistency across the
+ * two projects rather than inventing a different spread here. */
+const usdRangeTitle = (usd) => usd == null ? ""
+  : `My$ range: $${Math.round(usd * 0.85)}-$${Math.round(usd * 1.15)} ` +
+    `(+/-15% band around $${Math.round(usd)})`;
 const posClass = (l) => ({ QB: "pQB", RB: "pRB", WR: "pWR", TE: "pTE",
   FLX: "pFLX", K: "pK", DEF: "pDEF" }[l] || "");
 const isFav = (pid) => (doc.favorites || []).includes(pid);
@@ -1285,7 +1293,7 @@ function addRow(p, target, kdef) {
       + (cd ? `<span class="callm ${cd > 0 ? "up" : "dn"}" title="your call: ${cd > 0 ? "+" : ""}${cd}">${cd > 0 ? "+" : ""}${cd}</span>` : "") + `</span>`
       + `<span class="pts" title="estimated bid the room pays: your market source's average x the money-supply scale (x${mScale.toFixed(2)})">${bid}</span>`
       + `<span class="edge ${edge == null ? "" : Math.round(edge) > 0 ? "up" : Math.round(edge) < 0 ? "dn" : ""}" title="${edge == null ? "" : edge > 0 ? "a $" + Math.round(edge) + " deal vs the expected bid" : "$" + Math.round(-edge) + " over my value"}">${edge == null ? "" : (Math.round(edge) > 0 ? "+" : "") + Math.round(edge)}</span>`
-      + `<span class="usd">${fmt$(p.usd)}</span>`;
+      + `<span class="usd" title="${usdRangeTitle(p.usd)}">${fmt$(p.usd)}</span>`;
   }
   /* single click = popup; double click = nominate (ported timing trick) */
   row.onclick = () => {
