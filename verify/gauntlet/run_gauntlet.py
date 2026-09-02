@@ -161,7 +161,8 @@ async () => {
 
 def main():
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        exe = os.environ.get("GAUNTLET_CHROMIUM")
+        browser = p.chromium.launch(executable_path=exe) if exe else p.chromium.launch()
         context = browser.new_context()
 
         # ---- collect network + console across the AI-absent load ----
