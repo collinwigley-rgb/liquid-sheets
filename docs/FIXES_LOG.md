@@ -205,3 +205,33 @@ caveat from the previous entry using real data: Jaxon Smith-Njigba's
 keeper landed under a different owner in this mock than his real
 roster_id 1 (LaPorta Potty) in the league -- expected mock behavior, not
 a defect, and does not affect the real draft.
+
+---
+
+## 2026-09-02 -- Mock ownership resolution was wrong; the previous entry's "expected mock behavior" conclusion doesn't hold
+
+**What Collin caught:** checking the same mock directly in Sleeper's own
+UI, his real keeper (Colston Loveland) shows correctly under his real
+team there. That's a different finding than the previous entry recorded
+-- worth tracing rather than reconciling by assumption.
+
+**What was actually happening:** a Sleeper mock's own `slot_to_roster_id`
+map turns out to be a meaningless identity placeholder (`1:1, 2:2, ...`),
+not a real crosswalk to league ownership -- confirmed by comparing it
+against the REAL draft's own `slot_to_roster_id`, which is a real,
+non-identity mapping (e.g. slot 10 -> roster_id 2, Collin's actual
+team). A mock built "from league settings" reuses the real league's
+actual seating (same `draft_order`: a real user sits at the same slot
+number in the mock as in the real draft), so the real draft's map is
+what correctly resolves ownership for either draft's picks -- the mock
+just doesn't expose a usable version of that map itself.
+
+**Fix:** `pollDraft()` now takes `rosterMapDraftId`, and the app always
+passes the real Money_Talks draft_id there, regardless of which draft_id
+is actually being polled for picks.
+
+**Verification:** re-ran the same live mock's 11 keepers through the
+fix and checked every one against `sleeper.md`'s table directly. All 11
+now resolve to their correct real team (previously only 1 of 11 -- Kyle
+Pitts -- happened to land correctly, apparently by coincidence of the
+identity map lining up for that particular slot).
