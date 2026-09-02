@@ -22,19 +22,20 @@ engine.js's general formula (above), and FantasyEngine's separate
 pipeline for this same league (`config/vorp_baselines.R`,
 `scripts/calculate_vorp.R`). Comparing them:
 
-1. **Offense baselines (QB/RB/WR/TE):** `config/vorp_baselines.R` has
-   Money_Talks' replacement ranks measured directly from 3 real seasons
-   (2023-2025) of this league's own draft/spend history -- QB 32, RB 39,
-   WR 54, TE 15 ("VOND": 1 + the real count of players actually paid
-   above the $1 floor). Measured, league-specific history is a more
-   direct source for this number than a general formula.
-2. **IDP:** `calculate_vorp.R` intentionally does not compute continuous
-   VBD for IDP -- documented in that file as a standing decision, given
-   the lack of validated precision for IDP production at that level of
-   detail. It prices IDP with a two-tier fixed scheme instead (top 24 by
-   raw production get $3, everyone else gets $1), and tiers IDP
-   separately via a smash-score composite grounded in its own correlation
-   analysis (`calculate_idp_smash_tiers.R`).
+1. **Offense baselines (QB/RB/WR/TE):** `config/vorp_baselines.R` takes a
+   measured approach -- Money_Talks' replacement ranks come directly from
+   3 real seasons (2023-2025) of this league's own draft/spend history --
+   QB 32, RB 39, WR 54, TE 15 ("VOND": 1 + the real count of players
+   actually paid above the $1 floor). engine.js's formula takes a
+   general approach, useful for a league without that history available.
+   Different tools for different situations, not a better/worse call.
+2. **IDP:** `calculate_vorp.R` takes a different shape here too --
+   two-tier fixed pricing (top 24 by raw production get $3, everyone
+   else gets $1) plus a separate smash-score composite for tiering
+   (`calculate_idp_smash_tiers.R`), rather than continuous VBD. engine.js
+   had built continuous IDP VBD as its own approach. Two different ways
+   to handle the same real gap (IDP production doesn't cleanly support
+   the same kind of per-player VBD math offense does).
 
 **Determination:** blend the two rather than replace one with the other --
 use measured history where it exists, keep the general formula as a
