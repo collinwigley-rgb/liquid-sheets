@@ -21,6 +21,7 @@ import { pollDraft } from "./live_draft.js";
 
 let doc = null;
 let liveSyncStop = null;   // stop() from pollDraft(), non-null only while live sync is on
+let liveSyncDraftId = null; // overrides doc.league.sleeper_draft_id when set (testing against a mock)
 const $ = (sel) => document.querySelector(sel);
 const el = (tag, cls, text) => {
   const n = document.createElement(tag);
@@ -685,12 +686,15 @@ async function syncDraftPicks(picks) {
 function toggleLiveSync() {
   if (liveSyncStop) {
     liveSyncStop(); liveSyncStop = null;
-  } else if (doc.league.sleeper_draft_id) {
-    liveSyncStop = pollDraft(doc.league.sleeper_draft_id, {
-      onPicks: (picks) => { syncDraftPicks(picks); },
-      onError: (e) => console.warn("live draft sync: poll failed, will retry", e),
-      intervalMs: 5000,
-    });
+  } else {
+    const draftId = (liveSyncDraftId || "").trim() || doc.league.sleeper_draft_id;
+    if (draftId) {
+      liveSyncStop = pollDraft(draftId, {
+        onPicks: (picks) => { syncDraftPicks(picks); },
+        onError: (e) => console.warn("live draft sync: poll failed, will retry", e),
+        intervalMs: 5000,
+      });
+    }
   }
   renderBoardScreen();
 }
@@ -2230,6 +2234,15 @@ function renderBoardScreen() {
   /* appended after renderFlow(), which fully overwrites #flow's innerHTML
    * -- adding this earlier gets silently wiped by that call. */
   if (hf && doc.league.sleeper_draft_id) {
+    const idInp = el("input", "tiny-input");
+    idInp.placeholder = "draft/mock ID";
+    idInp.value = liveSyncDraftId || "";
+    idInp.title = "Optional: point live sync at a different draft_id " +
+      "(e.g. a Sleeper mock for testing) instead of the real draft. " +
+      "Leave blank to use the real Money_Talks draft.";
+    idInp.disabled = !!liveSyncStop;
+    idInp.oninput = () => { liveSyncDraftId = idInp.value; };
+    hf.appendChild(idInp);
     const b = el("button", "ghost tiny",
       liveSyncStop ? "Live sync: ON" : "Live sync: OFF");
     b.title = "Read-only: pulls picks (including keepers) from the real " +
