@@ -2451,7 +2451,16 @@ function renderBoardScreen() {
       ? "Force an immediate re-poll now, instead of waiting out the rest of the 5s interval."
       : "Turn on live sync first.";
     rb.disabled = !liveSyncStop;
-    rb.onclick = () => liveSyncStop?.refresh?.();
+    /* refresh() itself is fire-and-forget (tick() is async, nothing to
+     * await here) -- without this, clicking looks like it does nothing
+     * whenever the poll happens to return unchanged data. This is
+     * acknowledging the click, not reporting the fetch's real completion. */
+    rb.onclick = () => {
+      if (!liveSyncStop?.refresh) return;
+      liveSyncStop.refresh();
+      rb.textContent = "..."; rb.disabled = true;
+      setTimeout(() => { rb.textContent = "Refresh"; rb.disabled = !liveSyncStop; }, 700);
+    };
     hf.appendChild(rb);
   }
 }

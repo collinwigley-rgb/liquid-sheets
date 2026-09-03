@@ -548,3 +548,39 @@ bid $50 (ratio 1.28) rendered essentially the theme's full "bad" red,
 bid $28 (ratio 0.72) essentially full "good" green, bid $39 (ratio 1.0)
 exactly the theme's `--warn` RGB -- confirms the gradient is centered
 and scaled correctly, not just directionally right. Bumped V63 -> V64.
+
+---
+
+## 2026-09-02 -- Confirmed roster tracking was correct; the old contamination was never actually cleared on this browser; Refresh got visual feedback
+
+Two reports in a row: "the current roster and picked players is totally
+messed up" (again) and "the refresh button is there just not working."
+
+**Roster tracking:** checked the live site's real IndexedDB directly and
+found the SAME 216-entry contaminated journal from the earlier incident,
+byte-identical (same first/last entries, same timestamps) -- the
+previous "cleared" never took effect on this particular browser/device.
+Cleared it properly this time (the app's own two-click "Clear all
+sales" confirm, verified via a fresh IndexedDB read: 216 -> 0). With a
+genuinely clean board, re-verified roster/owner attribution three
+separate ways against hand-computed expected values (using the real
+draft's slot_to_roster_id map): three individual sale-attribution
+lookups (Jaxon Smith-Njigba -> LaPorta Potty, Colston Loveland -> Back
+Akers, Chris Olave -> Peekegbuka, all exactly matching manual
+calculation) plus the aggregate roster panel (budget math for "my
+roster" summed correctly against players shown). The mapping logic
+itself was never broken -- this was the same stale-data issue as
+before, just not actually resolved on this browser/device the first
+time. If testing from more than one browser or device, each one has its
+own separate saved league (IndexedDB doesn't sync) -- clear each one
+that's touched a mock.
+
+**Refresh button:** verified via network-log timestamps (not just
+"looks fine") that clicking it does fire an immediate extra poll --
+caught one at 168ms after the prior natural tick, clearly not waiting
+out the remaining ~4.8s. The button was working the whole time; it just
+gave zero visual acknowledgment of the click, so it looked broken
+whenever the poll happened to return unchanged data. Added a feedback
+pulse: button reads "..." and disables for 700ms after every click, an
+honest "your click registered" signal, not a claim about the fetch's
+real completion (which isn't awaited here). Bumped V64 -> V65.
