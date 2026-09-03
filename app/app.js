@@ -1292,6 +1292,23 @@ function buildModel() {
 const dealOf = (p) => (doc.market && p.usd != null && p.y_avg != null)
   ? p.usd - p.y_avg * mScale : null;
 
+/* How this draft's real sales are running vs My$ at this position/tier --
+ * "if players are going for $42 in a tier, then $38, we have an idea of
+ * the tier price." Same comps preference already used in THE BLOCK's
+ * heat readout: same-tier sales when there are any, else the whole
+ * position. Returns null when there's nothing sold yet to calibrate
+ * against -- never invents a drift from zero comps. */
+function tierDrift(pos, tier) {
+  const group = P.filter((x) => x.pos === pos && x.tier === tier && x.usd != null);
+  const soldTier = group.filter((x) => soldSet.has(x.id));
+  const soldPos = soldTier.length ? soldTier
+    : P.filter((x) => x.pos === pos && x.usd != null && soldSet.has(x.id));
+  if (!soldPos.length) return null;
+  const avg = soldPos.reduce((a, x) => a + (soldBy[x.id].price - x.usd), 0)
+    / soldPos.length;
+  return { drift: avg, n: soldPos.length, sameTier: soldTier.length > 0 };
+}
+
 /* ledger states in the original's field names */
 function oStates() {
   return ownerStates(doc.league, curSales).map((o) => ({
@@ -1826,13 +1843,34 @@ function advise(p) {
   const ps = planState();
   const fit = planFit(p, ps);
   const inf = inflation();
-  const deal = dealOf(p);
   const est = (doc.market && p.y_avg != null)
     ? Math.max(1, Math.round(p.y_avg * mScale * inf.ratio)) : null;
-  const val = p.usd != null ? Math.max(1, Math.round(p.usd)) : 1;
+  const rawVal = p.usd != null ? Math.max(1, Math.round(p.usd)) : 1;
+  /* Tier price recalibration: "if players are going for $42 in a tier,
+   * then $38, we have an idea of the tier price, and we can make
+   * adjustments" -- Collin, explicitly asking this feed the verdict
+   * itself, not just an informational side number. Only real sold comps
+   * move it (tierDrift returns null on zero comps -- never invents a
+   * drift). Skill positions only (K/DEF stay plan-driven per ADR-0011;
+   * comparable/drop above already use this same POSITIONS gate). */
+  const td = POSITIONS.includes(p.pos) ? tierDrift(p.pos, p.tier) : null;
+  const val = td ? Math.max(1, Math.round(rawVal + td.drift)) : rawVal;
+  /* The board's own Bid$/+/- columns (dealOf) stay pre-draft-vs-imported-
+   * market, untouched -- this is a second, separate signal (today's real
+   * sales) feeding only the verdict's own deal threshold below. */
+  const deal = (doc.market && p.y_avg != null) ? val - p.y_avg * mScale : dealOf(p);
   let worth = val;   /* the displayed value; K/DEF override it with the plan */
   const myMax = oStates().find((o) => o.is_me).max;
   const reasons = [];
+  /* Always say WHY the number moved, in plain language -- same principle
+   * as every other ceiling/reason in this function (ADR-0011). Only
+   * surfaces once the drift is bigger than rounding noise. */
+  if (td && Math.abs(Math.round(td.drift)) >= 2) {
+    const r = Math.round(td.drift);
+    reasons.push(`tier running ${r > 0 ? "hot" : "cold"} ${r > 0 ? "+" : ""}$${r} vs My$ `
+      + `(${td.n} sold ${p.pos}${td.n === 1 ? "" : "s"}${td.sameTier ? "" : ", whole position"}) `
+      + `-- worth adjusted from $${rawVal} to $${val}`);
+  }
 
   let comparable = null, drop = null;
   if (POSITIONS.includes(p.pos) && p.usd != null) {
@@ -1924,7 +1962,7 @@ function advise(p) {
   }
   return { cls, label, max: finalMax, worth, ceilWhy,
     planCap, benchPer: ps.benchPer, benchOpen: ps.benchOpen, est, reasons,
-    elig };
+    elig, td };
 }
 
 /* ---------------- AI live read (self-host only, gated) ----------------
@@ -2014,8 +2052,13 @@ function renderBlock() {
       && x.usd != null);
     const vals = group.map((x) => x.usd);
     let lo = Math.min(...vals), hi = Math.max(...vals);
+    /* Shift the whole range by the same tier drift as the target (a.worth,
+     * from advise() below) -- otherwise an adjusted target can land
+     * outside a range that's still showing pre-draft numbers, which reads
+     * as broken rather than "this tier got recalibrated." */
+    if (a.td) { lo += a.td.drift; hi += a.td.drift; }
     if (lo === hi) { lo -= 1; hi += 1; }
-    const target = Math.round(p.usd);
+    const target = a.worth;
     const rawPrice = parseInt($("#price")?.value, 10);
     const current = rawPrice >= 1 ? rawPrice : null;
     const pct = (v) => Math.max(0, Math.min(100,
@@ -2026,18 +2069,14 @@ function renderBlock() {
      * when his My$ IS the tier's min/max. */
     const labelPct = (v) => Math.max(7, Math.min(93, parseFloat(pct(v))));
 
-    const soldTier = group.filter((x) => soldSet.has(x.id));
-    const soldPos = soldTier.length ? soldTier
-      : P.filter((x) => x.pos === p.pos && x.usd != null && soldSet.has(x.id));
+    const td = a.td;
     let heat = `<span class="blk-heat" title="no sales yet at this position to compare against">no comps yet</span>`;
-    if (soldPos.length) {
-      const avg = soldPos.reduce((a2, x) =>
-        a2 + (soldBy[x.id].price - x.usd), 0) / soldPos.length;
-      const r = Math.round(avg);
+    if (td) {
+      const r = Math.round(td.drift);
       const cls = r >= 2 ? "hot" : r <= -2 ? "cold" : "";
       const lab = r >= 2 ? `TIER RUNNING HOT +$${r}`
         : r <= -2 ? `TIER RUNNING COLD $${r}` : `TIER STEADY ${r >= 0 ? "+" : ""}$${r}`;
-      heat = `<span class="blk-heat ${cls}" title="${soldPos.length} sold ${p.pos}${soldPos.length === 1 ? "" : "s"}${soldTier.length ? " at this tier" : " (no tier sales yet, using the whole position)"}, averaging $${r >= 0 ? "+" : ""}${r} vs My$">${lab}</span>`;
+      heat = `<span class="blk-heat ${cls}" title="${td.n} sold ${p.pos}${td.n === 1 ? "" : "s"}${td.sameTier ? " at this tier" : " (no tier sales yet, using the whole position)"}, averaging $${r >= 0 ? "+" : ""}${r} vs My$">${lab}</span>`;
     }
     scaleRow = `<div class="blk-row">
         <div class="blk-scale" title="his tier's My\$ range: $${Math.round(lo)} - $${Math.round(hi)}">

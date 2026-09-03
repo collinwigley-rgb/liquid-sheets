@@ -704,3 +704,50 @@ text nudges inward enough to stop colliding with $lo/$hi.
 Verified the clamp math directly against the exact repro case (target
 at tier max): label lands at 93% (not 100%), tick mark stays at exactly
 100%. Bumped V68 -> V69.
+
+---
+
+## 2026-09-02 -- Tier-price recalibration actually feeds the verdict
+
+Collin: "if players go for $42 in a tier, and the next player goes for
+$38, we have an idea of the tier price, and we can make adjustments."
+Asked directly whether this should just be shown alongside the existing
+numbers, or actually change the verdict itself -- he chose the latter,
+explicitly, so this changes `advise()`, the exact function ADR-0010/
+ADR-0011 protect from hardcoded strategy. Neither ADR guards against
+recalibrating from *real observed sales in this draft* -- they guard
+against ungrounded, hardcoded dollar rules -- so this doesn't violate
+their intent, but it's the first time `advise()`'s core `worth` number
+moves from something other than the pre-draft model or the user's own
+plan.
+
+Extracted `tierDrift(pos, tier)` (shared by `advise()` and THE BLOCK's
+heat readout, replacing what used to be duplicated inline logic in
+each): average (actual sale price - My$) for sold comps, same-tier
+preferred, whole-position fallback, `null` on zero comps (never invents
+a drift). `advise()` now computes `val = rawVal + tierDrift`, and
+`worth`/`max`/`planCap`/the deal threshold that picks LAST CHANCE vs
+TARGET vs FAIR VALUE vs LET HIM GO all flow from that adjusted `val` --
+not just a displayed side number. K/DEF is unaffected (still plan-driven
+only, per ADR-0011 -- `td` is gated by the same `POSITIONS.includes`
+check `comparable`/`drop` already used). The board's own My$/Bid$/+/-
+columns are untouched; this only feeds the verdict inside THE BLOCK.
+Every adjustment says why in plain language (the existing ADR-0011
+principle): "tier running cold -$32 vs My$ (9 sold QBs) -- worth
+adjusted from $39 to $7."
+
+Caught and fixed my own inconsistency while verifying: THE BLOCK's price
+scale (target tick, and the lo/hi range around it) still used the raw
+pre-draft numbers even after the verdict above it was adjusted -- e.g.
+"worth $7" at the top while the scale below still showed "target $39" in
+a $36-$42 range. Fixed by having `advise()` return `td` alongside
+`worth`, and having the scale use `a.worth` for the target and shift
+`lo`/`hi` by the same drift, so the whole scale moves together instead
+of just the headline number.
+
+Verified live end-to-end against real recorded sales (9 sold QBs
+averaging $32 under their My$): worth, the reason text, the scale's
+target tick, and the shifted $4-$10 range all agreed exactly ($39 ->
+$7). Separately confirmed K/DEF picks up zero tier-drift reasoning and
+stay exactly plan-driven, matching pre-existing ADR-0011 behavior. No
+console errors. Bumped V69 -> V70.
