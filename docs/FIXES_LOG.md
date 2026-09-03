@@ -622,3 +622,51 @@ duplicate, stale entry completely excluded. Confirmed the switch is
 clean both directions (toggling sync off reverts to showing the real
 journal's $999 again) and that `doc.journal` never moved (mock mode
 still writes nothing, ever). Bumped V65 -> V66.
+
+---
+
+## 2026-09-02 -- Recent Bids feed, and parked: Sleeper's own player value
+
+**Parked, not built:** Collin wants Sleeper's own per-player auction
+value ("$PROJ" in their draft room -- confirmed by looking directly at
+Sleeper's UI) shown alongside My$, since it's "always way wrong" for
+this league. Investigated with two separate attempts (network tracking
+armed BEFORE navigation both times, per usual): confirmed it's not a
+simple stat conversion (two players with nearly identical projected
+points, 139.8 vs 139.9, showed $17 vs $12 -- a position-relative VBD
+calc, not points-to-dollar), found no REST endpoint or field carrying
+it, and saw zero relevant XHR/fetch traffic even with tracking correctly
+armed -- strongly suggesting Sleeper's draft room loads this over a
+WebSocket, which is invisible to this project's network-inspection
+tools. Collin: park it, he'll look into it himself. Likely explanation
+for "always wrong" either way: Sleeper's number almost certainly assumes
+a generic standard roster (no IDP, no superflex), not Money_Talks' real
+shape.
+
+**Built: Recent Bids.** New rail panel, always visible (unlike THE
+BLOCK, which only shows while a player is staged -- an activity feed
+disappearing along with staging would defeat the point). Shows the last
+20 live bids seen -- team, player, amount, newest on top -- across the
+whole draft, not just the current nominee. Sourced from the same
+undocumented `metadata.offering_slot` field alongside
+`nominated_player_id`/`highest_offer` (`fetchDraftStatus` and
+`pollDraft`'s `onNomination` now also resolve and pass `ownerIdx`,
+through the same real-draft slot map already used for pick ownership).
+Honest limit, stated to Collin up front: this can only see whatever
+changed *between* polls (5s, or on-demand via Refresh) -- not every
+single increment if several bids land inside one window.
+
+Collin: "retain the top 20 bid events in a local store/cache" -- this is
+NOT staged like THE BLOCK's per-nominee data; it's a standing,
+cross-nomination log, persisted to `localStorage` (`ls-bidfeed`) so it
+survives a reload. Deliberately never cleared on live-sync stop/start
+(explicit "retain," not ephemeral like `mockSales`) and never written to
+`doc.journal` (activity-log flavor, not part of the league's real
+recorded state).
+
+Verified live against the real running mock (paused mid-nomination, so
+only one frozen bid to check, not a live sequence): captured "ME bid $18
+on Terry McLaurin" exactly matching Sleeper's own UI (`$18 @mondo_duke`
+on that same nomination), confirmed it round-trips through
+`localStorage` correctly across a full page reload with live sync off,
+no console errors. Bumped V66 -> V67.

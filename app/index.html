@@ -350,6 +350,14 @@ header{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;
   border-radius:6px}
 .panel h2{font-size:10px;font-weight:700;letter-spacing:.22em;color:var(--muted);
   margin-bottom:9px;text-transform:uppercase}
+#bidfeedlist{max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:3px}
+.bf-row{display:flex;align-items:baseline;gap:6px;font-family:var(--mono);
+  font-size:11px;line-height:1.3}
+.bf-team{color:var(--faint);font-weight:700;flex-shrink:0;width:34px}
+.bf-player{color:var(--muted);overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;flex:1;min-width:0}
+.bf-amt{color:var(--gold);font-weight:700;flex-shrink:0}
+.bf-empty{color:var(--faint);font-size:11.5px}
 #q{width:100%;background:var(--input);border:1px solid var(--line);
   border-radius:4px;padding:9px 11px;font-size:14px;outline:none}
 #q:focus{border-color:var(--focus)}
@@ -885,7 +893,7 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
       <button id="menuSleeper" class="gact">Import Sleeper values</button>
       <button id="menuReset" class="gact gdanger">Clear all sales</button>
       <div class="gdiv"></div>
-      <div class="ver gver">V66</div>
+      <div class="ver gver">V67</div>
     </div>
   </span>
 </header>

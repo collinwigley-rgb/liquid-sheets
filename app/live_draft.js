@@ -59,7 +59,12 @@ export async function fetchDraftStatus(draftId) {
   const m = d.metadata ?? {};
   return { status: d.status, type: d.type, slotToRosterId: d.slot_to_roster_id ?? {},
     nominatedPlayerId: m.nominated_player_id || null,
-    highOffer: m.highest_offer != null ? Number(m.highest_offer) : null };
+    highOffer: m.highest_offer != null ? Number(m.highest_offer) : null,
+    /* offering_slot: whoever currently holds the high offer -- same
+     * undocumented metadata as nominated_player_id/highest_offer. Resolved
+     * to a roster_id by the caller via the REAL draft's slot map (a
+     * mock's own map is untrustworthy, same reasoning as picks above). */
+    offeringSlot: m.offering_slot != null ? Number(m.offering_slot) : null };
 }
 
 /* Returns every pick Sleeper has recorded so far, oldest first, each as
@@ -130,8 +135,12 @@ export function pollDraft(draftId, { onPicks, onError, onNomination,
         const nomId = draftStatus.nominatedPlayerId;
         const playerId = nomId ? `sl:${nomId}` : null;
         const alreadySold = playerId && picks.some((p) => p.playerId === playerId);
+        const offeringRosterId = draftStatus.offeringSlot != null
+          ? slotToRosterId[draftStatus.offeringSlot] : null;
         onNomination(playerId && !alreadySold
-          ? { playerId, highOffer: draftStatus.highOffer } : null);
+          ? { playerId, highOffer: draftStatus.highOffer,
+              ownerIdx: offeringRosterId != null ? offeringRosterId - 1 : null }
+          : null);
       }
     } catch (e) {
       if (!stopped && onError) onError(e);

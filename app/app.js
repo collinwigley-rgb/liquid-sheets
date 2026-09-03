@@ -23,6 +23,15 @@ let doc = null;
 let liveSyncStop = null;   // stop() from pollDraft(), non-null only while live sync is on
 let liveSyncDraftId = null; // overrides doc.league.sleeper_draft_id when set (testing against a mock)
 let liveNomId = null;      // player id live sync currently believes is nominated, or null
+let lastBidKey = null;     // `${ownerIdx}:${amount}` for the CURRENT nominee, dedupes bidFeed
+                            // pushes across repeat polls; resets on nominee change, not saved
+/* Global live-bid feed (any nominee, any team), newest first, capped at 20.
+ * Retained across reloads in localStorage (Collin: "retain the top 20 bid
+ * events in a local store") -- never written to doc.journal, this is
+ * activity-log flavor, not part of the league's real recorded state. */
+let bidFeed = [];
+try { bidFeed = JSON.parse(localStorage.getItem("ls-bidfeed") || "[]"); }
+catch { bidFeed = []; }
 let mockActive = false;    // true only while polling a mock override -- when true, the
                             // board mirrors ONLY mockSales, never blended with doc.journal
 let mockSales = [];        // ephemeral sale-shaped rows from a MOCK poll, never persisted --
@@ -718,16 +727,50 @@ async function syncDraftPicks(picks, isMock) {
  * so this never steals focus or resets selOwner on every 5s tick; only
  * auto-clears staging on liveNomId's own transition to null/other, never
  * a player the user staged manually for research between nominations. */
+function saveBidFeed() {
+  try { localStorage.setItem("ls-bidfeed", JSON.stringify(bidFeed)); } catch { /* ignore */ }
+}
+
+function renderBidFeed() {
+  const el_ = $("#bidfeedlist");
+  if (!el_) return;
+  el_.innerHTML = bidFeed.length
+    ? bidFeed.map((b) => `<div class="bf-row">
+        <span class="bf-team">${b.team}</span>
+        <span class="bf-player" title="${b.player}">${b.player}</span>
+        <span class="bf-amt">$${b.amount}</span>
+      </div>`).join("")
+    : `<div class="bf-empty">no bids seen yet</div>`;
+}
+
 function syncNomination(nom) {
   const prevNomId = liveNomId;
   const validId = nom && byId[nom.playerId] ? nom.playerId : null;
   if (validId !== prevNomId) {
     liveNomId = validId;
+    lastBidKey = null;   // new nominee: only resets the dedupe check, feed itself is retained
     if (validId) pick(validId);
     else if (stagedId === prevNomId) resetSale();
   }
   if (validId && stagedId === validId && nom.highOffer != null) {
     $("#price").value = nom.highOffer;
+    /* Only a genuinely new (owner, amount) pair is a new bid -- this fires
+     * every 5s tick regardless of whether the offer actually changed, so
+     * without this check the feed would just repeat the same line. Can
+     * only see whatever changed BETWEEN polls, never every increment. */
+    if (nom.ownerIdx != null) {
+      const key = `${nom.ownerIdx}:${nom.highOffer}`;
+      if (key !== lastBidKey) {
+        lastBidKey = key;
+        const p = byId[validId];
+        const o = owners()[nom.ownerIdx];
+        bidFeed.unshift({ team: o ? short(o) : "?", player: p.name, pos: p.pos,
+          amount: nom.highOffer });
+        if (bidFeed.length > 20) bidFeed.length = 20;
+        saveBidFeed();
+        renderBidFeed();
+      }
+    }
     updateSummary();
   }
 }
@@ -2364,6 +2407,10 @@ function renderBoardScreen() {
       </div>
     </div>
     <div class="panel">
+      <h2 title="the last 20 live bids seen (team + amount), newest on top. Only sees whatever changed between polls, not every increment.">Recent Bids</h2>
+      <div id="bidfeedlist"></div>
+    </div>
+    <div class="panel">
       <h2 id="ledgerhead" style="cursor:pointer" title="click to collapse/expand">Owner ledger <span id="ledgerarrow">&#9662;</span></h2>
       <div id="ledgerbody">
         <div class="ohead"><span>team</span><span>left</span><span>max bid</span><span>open</span></div>
@@ -2433,7 +2480,8 @@ function renderBoardScreen() {
   };
 
   renderBoard(); renderTeams(); renderOwners(); renderRoster();
-  renderChips(); renderFavorites(); renderFlow(); renderBlock(); applyTab();
+  renderChips(); renderFavorites(); renderFlow(); renderBlock();
+  renderBidFeed(); applyTab();
   /* appended after renderFlow(), which fully overwrites #flow's innerHTML
    * -- adding this earlier gets silently wiped by that call. */
   if (hf && doc.league.sleeper_draft_id) {
