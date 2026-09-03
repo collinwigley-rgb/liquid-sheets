@@ -687,3 +687,20 @@ file (app.js:152) but wasn't applied here -- wrapped both `b.team` and
 `b.player` in `escHtml()`. `b.amount` is left as-is: it's always a
 `Number(...)` from live_draft.js, not a string, so it can't carry markup.
 No behavior change for real data. Bumped V67 -> V68.
+
+---
+
+## 2026-09-02 -- Fixed: target/bid label crowding at a tier's edge (issue #9)
+
+The known cosmetic gap from THE BLOCK's original ship: when a player's
+My$ IS his tier's min or max, the "target $X"/"bid $X" label sat right
+on top of the scale's own $lo/$hi end-label, since both used the exact
+same position. Fixed with a `labelPct()` clamp (7%-93%) applied only to
+the label text's position -- the tick mark itself still sits at the
+exact true value via the unclamped `pct()`, so the visual read (where
+this price truly falls in the range) doesn't change, only the label
+text nudges inward enough to stop colliding with $lo/$hi.
+
+Verified the clamp math directly against the exact repro case (target
+at tier max): label lands at 93% (not 100%), tick mark stays at exactly
+100%. Bumped V68 -> V69.

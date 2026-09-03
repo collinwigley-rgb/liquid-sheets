@@ -2020,6 +2020,11 @@ function renderBlock() {
     const current = rawPrice >= 1 ? rawPrice : null;
     const pct = (v) => Math.max(0, Math.min(100,
       ((v - lo) / (hi - lo)) * 100)).toFixed(1);
+    /* The tick itself stays at the exact value (pct); the label text is
+     * clamped inward so it never sits flush against $lo/$hi's own text at
+     * the container edge -- issue #9: "target" and the end-label collide
+     * when his My$ IS the tier's min/max. */
+    const labelPct = (v) => Math.max(7, Math.min(93, parseFloat(pct(v))));
 
     const soldTier = group.filter((x) => soldSet.has(x.id));
     const soldPos = soldTier.length ? soldTier
@@ -2040,9 +2045,9 @@ function renderBlock() {
           <div class="blk-track-wrap">
             <div class="blk-track"></div>
             <div class="blk-mark target" style="left:${pct(target)}%"></div>
-            <span class="blk-marklab" style="left:${pct(target)}%">target $${target}</span>
+            <span class="blk-marklab" style="left:${labelPct(target)}%">target $${target}</span>
             ${current != null ? `<div class="blk-mark current" style="left:${pct(current)}%"></div>
-            <span class="blk-marklab bid" style="left:${pct(current)}%">bid $${current}</span>` : ""}
+            <span class="blk-marklab bid" style="left:${labelPct(current)}%">bid $${current}</span>` : ""}
           </div>
           <span class="blk-endlab">$${Math.round(hi)}</span>
         </div>
