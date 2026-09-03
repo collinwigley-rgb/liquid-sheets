@@ -985,3 +985,88 @@ Confirmed via direct DOM/computed-style inspection on the live page:
 
 No code changes this pass. Closes the two "not yet verified" notes from
 the V75 and V77 entries above.
+
+---
+
+## 2026-09-03 -- Predraft room dropdown: pick Live or a remembered Mock, grouped and status-styled
+
+Collin sketched exactly this: a dropdown grouped "Live" / "Mock", each
+entry bold if active, gray if not started, italic if done -- pasted
+https://sleeper.com/draftboards/1389342583871766528 (the real
+Money_Talks draft's board -- that URL's id is the league_id, one less
+than the actual draft_id, confirmed against sleeper.md; Sleeper's UI
+apparently accepts either for a league's primary draft).
+
+**Researched before building anything** (this changes what's actually
+buildable, so it needed checking first, not assuming): tried to find a
+Sleeper API to auto-list Collin's own mock drafts so the dropdown could
+populate itself. There isn't one. `GET /v1/user/<user_id>/drafts/nfl/2026`
+-- the only enumeration endpoint that exists -- returned exactly 2
+entries for Collin's real account: the real Money_Talks draft, and an
+unrelated snake league. The mock he ran on 2026-09-02
+(`1400867924423528448`) was NOT in that list, despite still resolving
+fine by direct id (confirmed live, `status` had since flipped to
+`complete`). Sleeper simply does not track ad-hoc practice mocks in any
+user-facing list API. Presented this finding and a revised design to
+Collin before writing code; he approved (via the existing UX
+conventions already in the app -- inline tiny-input/ghost-tiny buttons,
+matching the app's own established small-control pattern, rather than a
+new dialog).
+
+**What got built**, given that constraint:
+- `sleeper_user_id` added to `money_talks_config.js` (regenerated via
+  `scripts/generate_money_talks_config.mjs`, not hand-edited --
+  `462234296409649152`, matches sleeper.md). Not currently read by app.js
+  (the enumeration idea it was fetched for turned out to be a dead end),
+  but cheap to keep now that it's already in the generator's fetch, in
+  case a future Sleeper API update adds real mock-listing support.
+- `live_draft.js`: `fetchDraftStatus` now also returns `startTime`
+  (`d.start_time`) for labeling dropdown entries. New `parseDraftId(input)`
+  pulls a draft_id out of either a raw numeric string or a pasted
+  `sleeper.com/draftboards/<id>`-style URL (`/(\d{10,})/` -- Sleeper's
+  snowflake ids are always well past 10 digits, so this doesn't
+  false-positive on shorter numbers a URL might contain).
+- `app.js`: `toggleLiveSync()` split into explicit `startLiveSync(draftId,
+  isMock)` / `stopLiveSync()` (the dropdown is a single-select, not a
+  toggle -- selecting a different entry needs to swap targets directly,
+  not stop-then-manually-restart). Mock ids the app has been pointed at
+  are remembered in `localStorage` (`ls-mocks`), never auto-populated.
+  `draftStatusCache` holds `{status, startTime, fetchedAt}` per draft id,
+  refreshed lazily (on render and on focusing the select, capped to
+  15s -- this is a picker, not something that needs its own 5s poll
+  independent of whichever draft is actually being synced) so opening
+  the dropdown doesn't spam Sleeper on every keystroke elsewhere in the
+  app.
+- UI: `#draftsel` replaces the old plain "draft/mock ID" text field --
+  `-- Off --` / `<optgroup Live>` (always the real draft) /
+  `<optgroup Mock>` (the remembered list), each option styled `st-active`
+  (bold, `status: drafting`) / `st-pending` (gray, `pre_draft`) /
+  `st-done` (italic, `complete`) via new CSS in index.html. An inline
+  "add mock: ID or URL" input + Add button validates the pasted id
+  actually resolves on Sleeper (one `fetchDraftStatus` call) before
+  remembering it -- garbage input never reaches `ls-mocks`. A Remove
+  button clears whichever mock is currently selected from the list
+  (does not touch Sleeper); if that mock was the one actively syncing,
+  removing it stops the sync too. The existing Refresh button
+  (force-repoll) is unchanged.
+- "Budget computed... after the fact with actual spends" needed no new
+  code: selecting a `complete` mock just polls it like any other draft,
+  and a finished draft's poll returns its full final pick list every
+  time -- the existing budget table, tier-price, and per-player
+  sold-price-vs-My$ flag all already consume that the same way they
+  consume the real journal. Confirmed live: selecting a completed
+  practice mock loaded LaPorta Potty's full actual roster (`QB Justin
+  Herbert $8`, `RB De'Von Achane $45`, ... `left $0`) and per-player sold
+  detail showed real recorded prices (`Jonathan Taylor SOLD $52 to
+  MoNami21, my$ $26, paid +$26 over`) -- not projections.
+
+Verified live (local dev server, not yet the deployed site): dropdown
+renders Live (correct real-draft date, gray/pre_draft) and, after
+adding the known mock by pasting its full draftboards URL, Mock (correct
+date, italic/complete) groups; `parseDraftId` correctly rejects
+non-numeric garbage before any alert or list-write; selecting the mock
+loads its real completed data as above; Remove clears `ls-mocks` and
+correctly reverts the board to the untouched real journal (verified the
+QB/RB/WR/TE progress counters returned to their pre-mock real values,
+not zeroed or blended). `node --check` clean on all three touched JS
+files, ASCII-only grep clean on all four touched files. Bumped V77 -> V78.

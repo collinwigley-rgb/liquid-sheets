@@ -52,6 +52,7 @@ async function main() {
    * (2026-09-02) rather than assumed from the top-level /v1/user/{username}
    * shape, which does have one. */
   const meIndex = rostersByOwner.findIndex((r) => userById[r.owner_id]?.display_name === "mondo_duke");
+  const meUserId = rostersByOwner[meIndex]?.owner_id;
   const s = league.scoring_settings;
 
   /* The engine's stat-line schema (app/sleeper.js's fetchSleeper) sums
@@ -116,6 +117,7 @@ export const MONEY_TALKS_LEAGUE = {
   me: ${meIndex},
   sleeper_league_id: "${LEAGUE_ID}",
   sleeper_draft_id: "${league.draft_id}",
+  sleeper_user_id: "${meUserId}",
 };
 `;
 

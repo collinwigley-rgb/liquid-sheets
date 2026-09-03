@@ -58,6 +58,7 @@ export async function fetchDraftStatus(draftId) {
   const d = await resp.json();
   const m = d.metadata ?? {};
   return { status: d.status, type: d.type, slotToRosterId: d.slot_to_roster_id ?? {},
+    startTime: d.start_time ?? null,
     nominatedPlayerId: m.nominated_player_id || null,
     highOffer: m.highest_offer != null ? Number(m.highest_offer) : null,
     /* offering_slot: whoever currently holds the high offer -- same
@@ -65,6 +66,22 @@ export async function fetchDraftStatus(draftId) {
      * to a roster_id by the caller via the REAL draft's slot map (a
      * mock's own map is untrustworthy, same reasoning as picks above). */
     offeringSlot: m.offering_slot != null ? Number(m.offering_slot) : null };
+}
+
+/* Pulls a draft_id out of either a raw numeric id or a pasted Sleeper URL
+ * (e.g. https://sleeper.com/draftboards/<id> or .../draft/nfl/<id>) -- the
+ * predraft-room dropdown (issue: predraft room mock/live picker) lets
+ * Collin paste whatever he copies from his browser's address bar. Sleeper
+ * has no API to enumerate a user's own mock drafts (verified live
+ * 2026-09-03: GET /v1/user/<id>/drafts/nfl/<season> does not list ad-hoc
+ * mocks started from a league, even ones that still resolve fine by
+ * direct id) -- so mocks are remembered locally, one paste at a time,
+ * rather than auto-discovered. Returns null if nothing id-shaped is found. */
+export function parseDraftId(input) {
+  const s = (input || "").trim();
+  if (!s) return null;
+  const m = /(\d{10,})/.exec(s);
+  return m ? m[1] : null;
 }
 
 /* Returns every pick Sleeper has recorded so far, oldest first, each as

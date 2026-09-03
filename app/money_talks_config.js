@@ -70,4 +70,5 @@ export const MONEY_TALKS_LEAGUE = {
   me: 1,
   sleeper_league_id: "1389342583871766528",
   sleeper_draft_id: "1389342583871766529",
+  sleeper_user_id: "462234296409649152",
 };

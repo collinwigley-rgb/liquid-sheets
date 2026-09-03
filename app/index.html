@@ -658,6 +658,10 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
 /* ---------- flow strip (right side of the masthead line, before the gear) -- */
 #flow{display:flex;gap:5px;align-items:center}
 #flow:empty{display:none}
+#draftsel{max-width:110px}
+#draftsel option.st-active{font-weight:700}
+#draftsel option.st-pending{color:var(--c-muted)}
+#draftsel option.st-done{font-style:italic;color:var(--c-muted)}
 .fcell{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;
   font-size:11px;color:var(--c-muted);border:1px solid var(--c-line);
   border-radius:4px;padding:3px 7px;background:var(--c-chip);cursor:default}
@@ -920,7 +924,7 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
       <button id="menuSleeper" class="gact">Import Sleeper values</button>
       <button id="menuReset" class="gact gdanger">Clear all sales</button>
       <div class="gdiv"></div>
-      <div class="ver gver">V77</div>
+      <div class="ver gver">V78</div>
     </div>
   </span>
 </header>

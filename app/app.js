@@ -17,7 +17,7 @@ import { fetchSleeper } from "./sleeper.js";
 import { myPlanState, planFit, defaultPlan } from "./plan.js";
 import { AI_ENABLED, AI_ENDPOINT } from "./config.js";
 import { MONEY_TALKS_LEAGUE } from "./money_talks_config.js";
-import { pollDraft } from "./live_draft.js";
+import { pollDraft, fetchDraftStatus, parseDraftId } from "./live_draft.js";
 
 let doc = null;
 let liveSyncStop = null;   // stop() from pollDraft(), non-null only while live sync is on
@@ -37,6 +37,47 @@ let mockActive = false;    // true only while polling a mock override -- when tr
 let mockSales = [];        // ephemeral sale-shaped rows from a MOCK poll, never persisted --
                             // rebuilt fresh every tick, cleared when live sync stops or
                             // switches back to the real draft. See syncDraftPicks.
+
+/* Predraft room picker (Live/Mock dropdown). Sleeper has no API to list a
+ * user's own mock drafts (verified 2026-09-03 -- see parseDraftId's
+ * comment in live_draft.js), so mocks are remembered here, one paste at a
+ * time, keyed by draft_id, retained across reloads. */
+let mockList = [];
+try { mockList = JSON.parse(localStorage.getItem("ls-mocks") || "[]"); }
+catch { mockList = []; }
+function saveMockList() {
+  try { localStorage.setItem("ls-mocks", JSON.stringify(mockList)); } catch { /* ignore */ }
+}
+/* {status, startTime, fetchedAt} per draft_id, used only to label/style the
+ * dropdown (bold = drafting, gray = pre_draft, italic = complete) -- never
+ * drives board state. Refreshed lazily (on render and on focusing the
+ * select), not polled continuously, since listing isn't live-syncing. */
+let draftStatusCache = {};
+async function refreshDraftStatuses(ids) {
+  const stale = [...new Set(ids)].filter((id) => id
+    && (!draftStatusCache[id] || Date.now() - draftStatusCache[id].fetchedAt > 15000));
+  if (!stale.length) return false;
+  await Promise.all(stale.map(async (id) => {
+    try {
+      const s = await fetchDraftStatus(id);
+      draftStatusCache[id] = { status: s.status, startTime: s.startTime, fetchedAt: Date.now() };
+    } catch {
+      draftStatusCache[id] = { status: null, startTime: null, fetchedAt: Date.now() };
+    }
+  }));
+  return true;
+}
+function fmtDraftWhen(startTime) {
+  if (!startTime) return "unscheduled";
+  const d = new Date(startTime);
+  return `${d.toLocaleDateString([], { month: "short", day: "numeric" })} ` +
+    `${d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+}
+function draftStatusClass(status) {
+  return status === "drafting" ? "st-active"
+    : status === "complete" ? "st-done"
+    : "st-pending";
+}
 const $ = (sel) => document.querySelector(sel);
 const el = (tag, cls, text) => {
   const n = document.createElement(tag);
@@ -680,8 +721,9 @@ async function makeRun() {
  * player twice -- no extra journal schema needed. Never writes back to
  * Sleeper.
  *
- * isMock (2026-09-02 fix): true whenever the "draft/mock ID" override
- * field is set, i.e. this poll is a rehearsal, not the real Friday draft.
+ * isMock (2026-09-02 fix): true whenever the predraft-room dropdown has
+ * a Mock entry selected, i.e. this poll is a rehearsal, not the real
+ * Friday draft.
  * A rehearsal must NEVER touch doc.journal -- it corrupted the real
  * saved board once already (216 fake sales from mock testing landed in
  * the real journal, since nothing used to distinguish the two). Mock
@@ -847,32 +889,36 @@ function syncNomination(nom) {
   }
 }
 
-function toggleLiveSync() {
-  if (liveSyncStop) {
-    liveSyncStop(); liveSyncStop = null; liveNomId = null;
-    if (mockActive) { mockActive = false; mockSales = []; renderBoardScreen(); }
-  } else {
-    const override = (liveSyncDraftId || "").trim();
-    const draftId = override || doc.league.sleeper_draft_id;
-    const isMock = !!override;
-    mockActive = isMock;
-    mockSales = [];
-    if (draftId) {
-      liveSyncStop = pollDraft(draftId, {
-        onPicks: (picks) => { syncDraftPicks(picks, isMock); },
-        onNomination: (nom) => { syncNomination(nom); },
-        onError: (e) => console.warn("live draft sync: poll failed, will retry", e),
-        intervalMs: 5000,
-        /* Always resolve ownership through the REAL draft's slot map, even
-         * when polling a mock -- a mock's own map is a meaningless identity
-         * placeholder (verified live 2026-09-02, see docs/FIXES_LOG.md); the
-         * real draft's map is the one that's actually correct, and a mock
-         * "from league settings" shares the same seating either way. */
-        rosterMapDraftId: doc.league.sleeper_draft_id,
-      });
-    }
+/* Stops whatever is currently syncing (real or mock), if anything. */
+function stopLiveSync() {
+  if (liveSyncStop) { liveSyncStop(); liveSyncStop = null; liveNomId = null; }
+  if (mockActive) { mockActive = false; mockSales = []; }
+  liveSyncDraftId = null;
+}
+
+/* Starts syncing against draftId (the real Money_Talks draft when
+ * isMock is false, a remembered mock otherwise). Replaces whatever was
+ * previously syncing -- the predraft-room dropdown is a single-select,
+ * only one draft is ever watched at a time. */
+function startLiveSync(draftId, isMock) {
+  stopLiveSync();
+  liveSyncDraftId = isMock ? draftId : null;
+  mockActive = isMock;
+  mockSales = [];
+  if (draftId) {
+    liveSyncStop = pollDraft(draftId, {
+      onPicks: (picks) => { syncDraftPicks(picks, isMock); },
+      onNomination: (nom) => { syncNomination(nom); },
+      onError: (e) => console.warn("live draft sync: poll failed, will retry", e),
+      intervalMs: 5000,
+      /* Always resolve ownership through the REAL draft's slot map, even
+       * when polling a mock -- a mock's own map is a meaningless identity
+       * placeholder (verified live 2026-09-02, see docs/FIXES_LOG.md); the
+       * real draft's map is the one that's actually correct, and a mock
+       * "from league settings" shares the same seating either way. */
+      rosterMapDraftId: doc.league.sleeper_draft_id,
+    });
   }
-  renderBoardScreen();
 }
 
 /* -------------------------------------------------------------- import */
@@ -2662,21 +2708,81 @@ function renderBoardScreen() {
   /* appended after renderFlow(), which fully overwrites #flow's innerHTML
    * -- adding this earlier gets silently wiped by that call. */
   if (hf && doc.league.sleeper_draft_id) {
-    const idInp = el("input", "tiny-input");
-    idInp.placeholder = "draft/mock ID";
-    idInp.value = liveSyncDraftId || "";
-    idInp.title = "Optional: point live sync at a different draft_id " +
-      "(e.g. a Sleeper mock for testing) instead of the real draft. " +
-      "Leave blank to use the real Money_Talks draft.";
-    idInp.disabled = !!liveSyncStop;
-    idInp.oninput = () => { liveSyncDraftId = idInp.value; };
-    hf.appendChild(idInp);
-    const b = el("button", "ghost tiny",
-      liveSyncStop ? "Live sync: ON" : "Live sync: OFF");
-    b.title = "Read-only: pulls picks (including keepers) from the real " +
-      "Sleeper draft/mock every 5s. Never writes back to Sleeper.";
-    b.onclick = () => toggleLiveSync();
-    hf.appendChild(b);
+    const liveId = doc.league.sleeper_draft_id;
+    const sel = el("select", "tiny-input");
+    sel.id = "draftsel";
+    sel.title = "Predraft room: pick which Sleeper draft to sync (read-only, " +
+      "never writes back). Bold = drafting now, gray = not started yet, " +
+      "italic = complete.";
+    const renderDraftOptions = () => {
+      const liveInfo = draftStatusCache[liveId] || {};
+      const parts = [`<option value="">-- Off --</option>`,
+        `<optgroup label="Live"><option value="__live__" class="${draftStatusClass(liveInfo.status)}">` +
+        `${fmtDraftWhen(liveInfo.startTime)}</option></optgroup>`];
+      if (mockList.length) {
+        const mockOpts = mockList.map((id) => {
+          const info = draftStatusCache[id] || {};
+          return `<option value="${id}" class="${draftStatusClass(info.status)}">` +
+            `${fmtDraftWhen(info.startTime)}</option>`;
+        }).join("");
+        parts.push(`<optgroup label="Mock">${mockOpts}</optgroup>`);
+      }
+      sel.innerHTML = parts.join("");
+      sel.value = !liveSyncStop ? "" : mockActive ? liveSyncDraftId : "__live__";
+    };
+    renderDraftOptions();
+    hf.appendChild(sel);
+    refreshDraftStatuses([liveId, ...mockList]).then((changed) => { if (changed) renderDraftOptions(); });
+    sel.onfocus = () => refreshDraftStatuses([liveId, ...mockList])
+      .then((changed) => { if (changed) renderDraftOptions(); });
+    sel.onchange = () => {
+      const v = sel.value;
+      if (!v) stopLiveSync();
+      else if (v === "__live__") startLiveSync(liveId, false);
+      else startLiveSync(v, true);
+      renderBoardScreen();
+    };
+
+    const addInp = el("input", "tiny-input");
+    addInp.placeholder = "add mock: ID or URL";
+    addInp.title = "Paste a mock draft's Sleeper URL " +
+      "(e.g. sleeper.com/draftboards/<id>) or its numeric id to add it " +
+      "to the Mock list -- Sleeper has no API to list these automatically.";
+    hf.appendChild(addInp);
+    const addBtn = el("button", "ghost tiny", "Add");
+    addBtn.onclick = async () => {
+      const id = parseDraftId(addInp.value);
+      if (!id) {
+        alert("Could not find a draft id in that -- paste the mock's Sleeper URL or its numeric id.");
+        return;
+      }
+      addBtn.textContent = "..."; addBtn.disabled = true;
+      try {
+        await fetchDraftStatus(id); // validate it actually resolves before remembering it
+      } catch {
+        alert("Sleeper couldn't find that draft. Double check the id/URL.");
+        addBtn.textContent = "Add"; addBtn.disabled = false;
+        return;
+      }
+      if (!mockList.includes(id)) { mockList.push(id); saveMockList(); }
+      await refreshDraftStatuses([id]);
+      renderBoardScreen();
+    };
+    hf.appendChild(addBtn);
+
+    const rmBtn = el("button", "ghost tiny", "Remove");
+    rmBtn.title = "Remove the selected mock from this list (does not touch Sleeper).";
+    rmBtn.disabled = !(sel.value && sel.value !== "__live__");
+    rmBtn.onclick = () => {
+      const id = sel.value;
+      mockList = mockList.filter((x) => x !== id);
+      saveMockList();
+      delete draftStatusCache[id];
+      if (liveSyncDraftId === id) stopLiveSync();
+      renderBoardScreen();
+    };
+    hf.appendChild(rmBtn);
+
     const rb = el("button", "ghost tiny", "Refresh");
     rb.title = liveSyncStop
       ? "Force an immediate re-poll now, instead of waiting out the rest of the 5s interval."
