@@ -904,3 +904,42 @@ show it rather than rendering zeros.
 and whether `target: $0` for a fully-drafted position (all slots filled)
 reads clearly as "done" rather than looking broken -- worth a look next
 session. Bumped V74 -> V75.
+
+---
+
+## 2026-09-03 -- Recent Bids scrollbar removed; "not seeing anything" traced to client-side SW cache
+
+Collin: "lets get it live. i'm not seeing anything. Also theres a
+scroll bar we dont need in the 'recent bids' just hard code taht out."
+
+**Scrollbar**: `.blk-bidfeed` had `max-height:190px;overflow-y:auto`
+left over from before the feed's row cap was tightened -- with at most
+20 rows at ~15px line-height that box never actually needs to scroll,
+so the scrollbar was pure visual noise. Removed both properties,
+replaced with `overflow:hidden` (per Collin's "just hard code that
+out" -- no scrolling, ever, regardless of row count).
+
+**"Not seeing anything"**: verified the deploy is NOT broken at the
+origin -- `gh api .../pages/builds/latest` showed `built` at the exact
+pushed commit, and a direct `curl -D-` against the live
+`app/index.html` and `app/sw.js` came back with `Cache-Control:
+max-age=600` / `x-proxy-cache: MISS` (a genuinely fresh fetch, not a
+stale edge hit) showing V75 and `CACHE = "liquid-sheets-v75"` correctly
+present. So the gap is client-side: this is the same service-worker
+staleness class fixed earlier tonight (see the V75 entry above) --
+until a browser's installed SW actually cycles through install/
+activate for the new CACHE name, that tab keeps being served whatever
+shell files it cached under the OLD name, even though the origin is
+already serving the new ones. `skipWaiting()` + `clients.claim()` mean
+this should self-heal within a reload or two without any manual cache
+clearing, once a version at or after this fix (V75+) has had a chance
+to install once -- but the very first time a browser upgrades onto the
+self-healing SW, that upgrade itself still has to survive whatever SW
+was active before it existed.
+
+Verified: `node --check` on `app.js`/`sw.js`, ASCII-only grep clean on
+both changed files. Not verified live this pass (credits constrained,
+per Collin's earlier flag) -- if a hard refresh doesn't clear it for
+Collin, next step is checking `navigator.serviceWorker.getRegistrations()`
+on his actual device rather than assuming the fix alone is sufficient.
+Bumped V75 -> V76.

@@ -361,7 +361,7 @@ header{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;
  * instead (see FIXES_LOG.md). Only visible while THE BLOCK is, since
  * it's part of it now -- the underlying feed itself still persists
  * (see bidFeed/saveBidFeed in app.js), only visibility changed. */
-.blk-bidfeed{width:150px;flex-shrink:0;max-height:190px;overflow-y:auto;
+.blk-bidfeed{width:150px;flex-shrink:0;overflow:hidden;
   border-left:1px solid var(--line-soft);padding-left:14px;
   display:flex;flex-direction:column;gap:3px}
 .blk-bidfeed-hd{font-size:10px;font-weight:700;letter-spacing:.18em;
@@ -920,7 +920,7 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
       <button id="menuSleeper" class="gact">Import Sleeper values</button>
       <button id="menuReset" class="gact gdanger">Clear all sales</button>
       <div class="gdiv"></div>
-      <div class="ver gver">V75</div>
+      <div class="ver gver">V76</div>
     </div>
   </span>
 </header>
