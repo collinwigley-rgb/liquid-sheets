@@ -1306,7 +1306,9 @@ function tierDrift(pos, tier) {
   if (!soldPos.length) return null;
   const avg = soldPos.reduce((a, x) => a + (soldBy[x.id].price - x.usd), 0)
     / soldPos.length;
-  return { drift: avg, n: soldPos.length, sameTier: soldTier.length > 0 };
+  const avgPrice = soldPos.reduce((a, x) => a + soldBy[x.id].price, 0)
+    / soldPos.length;
+  return { drift: avg, avgPrice, n: soldPos.length, sameTier: soldTier.length > 0 };
 }
 
 /* ledger states in the original's field names */
@@ -2099,7 +2101,8 @@ function renderBlock() {
     if (current != null) {
       heroRow = `<div class="blk-row blk-hero">
         <div class="blk-bignum" style="color:${bidHeat(current / target)}">$${current}</div>
-        <div class="blk-refs"><span>FAIR <b>$${target}</b></span><span>PEAK <b>$${Math.round(hi)}</b></span></div>
+        <div class="blk-refs"><span>FAIR <b>$${target}</b></span><span>PEAK <b>$${Math.round(hi)}</b></span>${a.td
+          ? `<span title="${a.td.n} sold ${p.pos}${a.td.n === 1 ? "" : "s"}${a.td.sameTier ? " at this tier" : " (whole position)"}">AVG TIER <b>$${Math.round(a.td.avgPrice)}</b></span>` : ""}</div>
       </div>`;
     }
   }

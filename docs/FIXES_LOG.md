@@ -751,3 +751,23 @@ target tick, and the shifted $4-$10 range all agreed exactly ($39 ->
 $7). Separately confirmed K/DEF picks up zero tier-drift reasoning and
 stay exactly plan-driven, matching pre-existing ADR-0011 behavior. No
 console errors. Bumped V69 -> V70.
+
+---
+
+## 2026-09-02 -- AVG TIER as its own number in THE BLOCK
+
+Collin: "avg Tier price should be a value in THE BLOCK." The hero row
+already had FAIR (adjusted worth) and PEAK (tier ceiling), but neither
+is literally "what did this tier actually sell for" -- FAIR is the
+model's recalibrated estimate, not the raw observed number. Added
+`avgPrice` to `tierDrift()`'s return (the plain average of the sold
+comps' actual sale prices, alongside the existing drift-vs-My$ average)
+and a third hero-row line, "AVG TIER $X", shown whenever there are
+comps.
+
+Verified live: 9 sold QBs averaging $32 under their own My$ (the
+existing drift) resolved to AVG TIER $8, consistent with those same
+comps having averaged roughly $40 My$ themselves ($8 - (-$32) = $40,
+in the right range for mid-tier QBs) -- not just plausible-looking, the
+arithmetic actually ties out. Three stacked hero-row lines render
+cleanly with no layout break, no console errors. Bumped V70 -> V71.
