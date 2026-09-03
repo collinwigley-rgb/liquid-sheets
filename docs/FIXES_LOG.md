@@ -806,3 +806,32 @@ from the app itself (the gear menu's version number IS the file that
 was stale). Recovery for anyone already stuck: clear that site's
 browser data (works without devtools, including on mobile) and reload
 -- the fixed install logic then runs clean. Bumped V71 -> V72.
+
+---
+
+## 2026-09-02 -- Recent Bids moved into THE BLOCK, right-aligned
+
+Collin: "the bids are supposed to be embedded in THE BLOCK on the right
+side, right aligned. Is that not what's happening?" It wasn't -- I'd put
+it in the rail instead, on my own judgment (reasoning that an
+always-visible activity log made more sense than one that disappears
+with staging). That was my call to make differently than asked; checked
+back and he confirmed he wants it in THE BLOCK regardless of that
+tradeoff.
+
+Moved it: removed the rail panel entirely, added `.blk-bidfeed` as a
+third column inside `#theblock` (alongside the photo and body), right-
+aligned text, narrow fixed width. `renderBidFeed()` (used to target the
+rail's `#bidfeedlist` directly) became `bidFeedHtml()`, a pure markup
+generator `renderBlock()` calls -- no separate render pass needed, since
+`renderBlock()` already re-runs via `updateSummary()` every time a bid
+lands. The underlying feed itself (global, persisted to localStorage) is
+unchanged; only where it's visible changed -- it now shows only while a
+player is staged, same as the rest of THE BLOCK, which is the accepted
+tradeoff.
+
+Verified live: "RECENT BIDS" renders top-right of THE BLOCK correctly
+right-aligned, confirmed the rail's old panel and `#bidfeedlist` element
+are both gone, confirmed the feed still reads its existing persisted
+data correctly, confirmed THE BLOCK (and the feed with it) fully hides
+on Escape/unstaging as expected. No console errors. Bumped V72 -> V73.

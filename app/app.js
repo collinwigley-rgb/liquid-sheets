@@ -731,10 +731,13 @@ function saveBidFeed() {
   try { localStorage.setItem("ls-bidfeed", JSON.stringify(bidFeed)); } catch { /* ignore */ }
 }
 
-function renderBidFeed() {
-  const el_ = $("#bidfeedlist");
-  if (!el_) return;
-  el_.innerHTML = bidFeed.length
+/* Markup only -- embedded inside THE BLOCK (right-aligned column), which
+ * only renders while a player is staged. Collin explicitly chose this
+ * over the always-visible rail panel it started in: the feed is global
+ * and persisted (see bidFeed above), but only VISIBLE while THE BLOCK
+ * itself is. */
+function bidFeedHtml() {
+  return bidFeed.length
     ? bidFeed.map((b) => `<div class="bf-row">
         <span class="bf-team">${escHtml(b.team)}</span>
         <span class="bf-player" title="${escHtml(b.player)}">${escHtml(b.player)}</span>
@@ -768,7 +771,9 @@ function syncNomination(nom) {
           amount: nom.highOffer });
         if (bidFeed.length > 20) bidFeed.length = 20;
         saveBidFeed();
-        renderBidFeed();
+        /* renderBlock() picks this up via the updateSummary() call just
+         * below, which always re-renders THE BLOCK -- no separate call
+         * needed now that the feed lives inside it, not a rail element. */
       }
     }
     updateSummary();
@@ -2134,6 +2139,10 @@ function renderBlock() {
       ${slotRows ? `<div class="blk-row">${slotRows}</div>` : ""}
       ${a.reasons.length ? `<div class="blk-row"><ul class="blk-reasons">${a.reasons.slice(0, 5).map((r) => `<li>${r}</li>`).join("")}</ul></div>` : ""}
       ${scaleRow}
+    </div>
+    <div class="blk-bidfeed" title="the last 20 live bids seen (team + amount), newest on top. Only sees whatever changed between polls, not every increment.">
+      <div class="blk-bidfeed-hd">Recent Bids</div>
+      ${bidFeedHtml()}
     </div>`;
   block.classList.add("show");
 }
@@ -2454,10 +2463,6 @@ function renderBoardScreen() {
       </div>
     </div>
     <div class="panel">
-      <h2 title="the last 20 live bids seen (team + amount), newest on top. Only sees whatever changed between polls, not every increment.">Recent Bids</h2>
-      <div id="bidfeedlist"></div>
-    </div>
-    <div class="panel">
       <h2 id="ledgerhead" style="cursor:pointer" title="click to collapse/expand">Owner ledger <span id="ledgerarrow">&#9662;</span></h2>
       <div id="ledgerbody">
         <div class="ohead"><span>team</span><span>left</span><span>max bid</span><span>open</span></div>
@@ -2527,8 +2532,7 @@ function renderBoardScreen() {
   };
 
   renderBoard(); renderTeams(); renderOwners(); renderRoster();
-  renderChips(); renderFavorites(); renderFlow(); renderBlock();
-  renderBidFeed(); applyTab();
+  renderChips(); renderFavorites(); renderFlow(); renderBlock(); applyTab();
   /* appended after renderFlow(), which fully overwrites #flow's innerHTML
    * -- adding this earlier gets silently wiped by that call. */
   if (hf && doc.league.sleeper_draft_id) {
