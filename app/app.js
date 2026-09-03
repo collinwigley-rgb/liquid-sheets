@@ -1446,6 +1446,33 @@ function planState() {
   });
 }
 
+/* Per-position roll-up of the plan's slot-level envelopes -- Collin: "if I
+ * spend 35 on my rb1, I have clarity on my remaining budget for starting
+ * RB room... overspend on QB1, it pushes my total available budget for
+ * RB and WR." ps.slots already models exactly this (myPlanState's water-
+ * fill scales every OPEN starter envelope together off the same shared
+ * pool, so one overspend already shrinks what the others get) -- this
+ * just sums that existing per-slot state by position label instead of
+ * showing it slot-by-slot (RB1/RB2 separately). FLX intentionally stays
+ * its own line, never split across RB/WR/TE: it can't be attributed to
+ * one position ahead of the pick, same as the roster panel already shows
+ * FLX separately. K/DEF/BN are the "purse" bucket, not shown here --
+ * this is about the starting skill positions specifically. */
+function budgetByPosition(ps) {
+  const groups = {};
+  ["QB", "RB", "WR", "TE", "FLX"].forEach((lab) => {
+    groups[lab] = { target: 0, spent: 0, left: 0 };
+  });
+  ps.slots.forEach((s) => {
+    const g = groups[s.lab];
+    if (!g) return;
+    g.target += s.planned || 0;
+    if (s.who) g.spent += s.price || 0;
+    else g.left += s.eff ?? s.planned ?? 0;
+  });
+  return groups;
+}
+
 /* BeerSheets-style surplus shading (ported, incl. sqrt scale) */
 /* Continuous green -> amber -> red for THE BLOCK's big current-bid number:
  * how hot the live price is running vs. fair value (My$), not a discrete
@@ -2180,6 +2207,31 @@ function renderBlock() {
     }
   }
 
+  /* Position budget roll-up: see budgetByPosition's doc comment for why
+   * this is a sum of existing slot-level state, not new budget math. */
+  const ps = planState();
+  let budgetRow = "";
+  if (ps.hasPlan) {
+    const groups = budgetByPosition(ps);
+    const totalTarget = Object.values(groups)
+      .reduce((s, g) => s + g.target, 0);
+    const rows = ["QB", "RB", "WR", "TE", "FLX"].map((lab) => {
+      const g = groups[lab];
+      const pct = totalTarget > 0 ? Math.round(g.target / totalTarget * 100) : 0;
+      return `<tr><td class="${posClass(lab)}">${lab}</td>
+        <td>${fmt$(g.target)}</td>
+        <td>${g.spent ? fmt$(g.spent) : "-"}</td>
+        <td>~${fmt$(g.left)}</td>
+        <td>${pct}%</td></tr>`;
+    }).join("");
+    budgetRow = `<div class="blk-row">
+      <table class="blk-budget" title="target: your plan's envelope per position, summed across its slots (e.g. RB1+RB2). spent/left reflect real sales and the plan's live water-fill -- overspending one open slot already shrinks what the others get. Percent is target vs your total starting-roster budget (bench/K/DEF excluded).">
+        <thead><tr><th></th><th>TARGET</th><th>SPENT</th><th>LEFT</th><th>%</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  }
+
   const ceilLine = a.max < a.worth
     ? `<div class="cceil">spend up to <b>$${a.max}</b> <small>${a.ceilWhy}</small></div>` : "";
   const slotRows = a.elig.length
@@ -2204,6 +2256,7 @@ function renderBlock() {
         ${a.est ? `<div class="cest">room bids <b>~$${a.est}</b></div>` : ""}
       </div>
       ${heroRow}
+      ${budgetRow}
       ${slotRows ? `<div class="blk-row">${slotRows}</div>` : ""}
       ${a.reasons.length ? `<div class="blk-row"><ul class="blk-reasons">${a.reasons.slice(0, 5).map((r) => `<li>${r}</li>`).join("")}</ul></div>` : ""}
       ${scaleRow}

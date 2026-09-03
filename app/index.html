@@ -262,6 +262,12 @@ header{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;
 .blk-refs{display:flex;flex-direction:column;gap:2px;font-family:var(--mono);
   font-size:12px;color:var(--faint)}
 .blk-refs b{color:var(--text);font-size:14.5px}
+.blk-budget{border-collapse:collapse;font-family:var(--mono);font-size:11.5px}
+.blk-budget th{color:var(--faint);font-weight:400;text-align:right;
+  padding:0 8px 3px 0;letter-spacing:.06em}
+.blk-budget th:first-child{text-align:left}
+.blk-budget td{padding:2px 8px 2px 0;text-align:right}
+.blk-budget td:first-child{text-align:left;font-weight:700}
 .layout{flex:1;min-height:0;display:grid;grid-template-columns:1fr 312px}
 .boardcol{min-width:0;display:flex;flex-direction:column;overflow:hidden;
   border-right:2px solid var(--line)}
@@ -914,7 +920,7 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
       <button id="menuSleeper" class="gact">Import Sleeper values</button>
       <button id="menuReset" class="gact gdanger">Clear all sales</button>
       <div class="gdiv"></div>
-      <div class="ver gver">V74</div>
+      <div class="ver gver">V75</div>
     </div>
   </span>
 </header>

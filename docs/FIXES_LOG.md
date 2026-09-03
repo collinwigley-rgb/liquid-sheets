@@ -868,3 +868,39 @@ confirmed the reverse (receiving + a small rushing package, no passing);
 confirmed the empty state shows correctly with nothing staged; confirmed
 switching to BOARD/TEAMS and back doesn't disturb THE BLOCK above it.
 No console errors. Bumped V73 -> V74.
+
+---
+
+## 2026-09-02 -- Per-position budget table in THE BLOCK (built fast, credits running low)
+
+Collin: "target budget for the starting role, remaining budget for
+target role... if I overspend on QB1, it pushes my available budget for
+RB and WR." Confirmed scope first: all positions at once (a table, not
+just the staged player's), FLX as its own line (never split across
+RB/WR/TE, matching how the roster panel already treats it separately).
+
+This is a rollup, not new budget math: `plan.js`'s `myPlanState` water-
+fill already scales every OPEN starter envelope off one shared pool, so
+one overspend already shrinks what every other open slot gets -- it was
+just shown per literal slot (RB1/RB2 separately), not per position. New
+`budgetByPosition(ps)` sums `ps.slots` by label (target = planned
+envelope summed, spent = filled slots' real price, left = open slots'
+live water-filled `eff`) into QB/RB/WR/TE/FLX rows, plus target % of the
+starting-roster budget (bench/K/DEF excluded, matching "starting role").
+Rendered as a new `.blk-budget` table, a `.blk-row` inside THE BLOCK
+between the hero row and per-player roster-fit.
+
+Verified live (one fast targeted pass, not the usual multi-angle
+sweep -- Collin flagged he's at 70% of his usage limit mid-build and
+asked this land in a safe, committed state rather than get polished
+further): staged a real player, confirmed the table renders with real
+numbers, and it's already showing the exact dynamic asked for --
+WR was $73 spent against a $66 target, correctly showing ~$0 left
+rather than a naive per-slot number. No console errors. `ps.hasPlan`
+guards the whole row, so leagues without a budget plan simply don't
+show it rather than rendering zeros.
+
+**Not yet verified**: narrow-width wrapping of the new 5-column table,
+and whether `target: $0` for a fully-drafted position (all slots filled)
+reads clearly as "done" rather than looking broken -- worth a look next
+session. Bumped V74 -> V75.
