@@ -670,3 +670,20 @@ on Terry McLaurin" exactly matching Sleeper's own UI (`$18 @mondo_duke`
 on that same nomination), confirmed it round-trips through
 `localStorage` correctly across a full page reload with live sync off,
 no console errors. Bumped V66 -> V67.
+
+---
+
+## 2026-09-02 -- Fixed: XSS in Recent Bids' team/player interpolation
+
+Post-push security review caught `renderBidFeed()`: `b.team`
+(derived from `doc.league.team_names`, ultimately a Sleeper user's own
+display name) and `b.player` were interpolated unescaped, `b.player`
+inside a `title="..."` attribute -- the same attribute-breakout class
+already fixed once today in `headshotUrl()`. A crafted team/player
+string could break out of the attribute and inject markup.
+
+Fixed using the escHtml() helper that already existed elsewhere in this
+file (app.js:152) but wasn't applied here -- wrapped both `b.team` and
+`b.player` in `escHtml()`. `b.amount` is left as-is: it's always a
+`Number(...)` from live_draft.js, not a string, so it can't carry markup.
+No behavior change for real data. Bumped V67 -> V68.

@@ -736,8 +736,8 @@ function renderBidFeed() {
   if (!el_) return;
   el_.innerHTML = bidFeed.length
     ? bidFeed.map((b) => `<div class="bf-row">
-        <span class="bf-team">${b.team}</span>
-        <span class="bf-player" title="${b.player}">${b.player}</span>
+        <span class="bf-team">${escHtml(b.team)}</span>
+        <span class="bf-player" title="${escHtml(b.player)}">${escHtml(b.player)}</span>
         <span class="bf-amt">$${b.amount}</span>
       </div>`).join("")
     : `<div class="bf-empty">no bids seen yet</div>`;
