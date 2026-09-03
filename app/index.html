@@ -606,6 +606,18 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
 .btab:hover{color:var(--c-text)}
 
 /* ---------- teams grid ---------- */
+/* PLAYER tab: the roto stat line behind My$, for whoever is staged. */
+#playertab{background:var(--ground);padding:16px;overflow-y:auto}
+.ptab-empty{color:var(--faint);font-size:13px}
+.ptab-head{display:flex;align-items:baseline;gap:10px;margin-bottom:14px}
+.ptab-name{font-weight:700;font-size:18px}
+.ptab-pts{margin-left:auto;font-family:var(--mono);font-weight:700;
+  color:var(--gold)}
+.ptab-pts small{font-weight:400;color:var(--faint);font-size:11px}
+.ptab-table{border-collapse:collapse;font-family:var(--mono);font-size:13px}
+.ptab-table td{padding:5px 16px 5px 0;border-bottom:1px solid var(--line-soft)}
+.ptab-table td:first-child{color:var(--faint);letter-spacing:.08em}
+.ptab-table td:last-child{font-weight:700;text-align:right}
 #teams{background:var(--ground);padding:10px;overflow-x:auto}
 #tgrid{display:flex;gap:8px;min-width:max-content}
 .tcol{width:148px;flex:0 0 148px}
@@ -902,7 +914,7 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
       <button id="menuSleeper" class="gact">Import Sleeper values</button>
       <button id="menuReset" class="gact gdanger">Clear all sales</button>
       <div class="gdiv"></div>
-      <div class="ver gver">V73</div>
+      <div class="ver gver">V74</div>
     </div>
   </span>
 </header>

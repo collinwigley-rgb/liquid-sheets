@@ -736,6 +736,73 @@ function saveBidFeed() {
  * over the always-visible rail panel it started in: the feed is global
  * and persisted (see bidFeed above), but only VISIBLE while THE BLOCK
  * itself is. */
+/* Raw roto stat line for a player, in this app's own field names (see
+ * sleeper.js's STAT_MAP/IDP_STAT_MAP) -- the same numbers My$ is scored
+ * from, just not converted to points/dollars. Matches on both id and pos
+ * since one player can have more than one row (IDP eligibility across
+ * DL/LB/DB buckets). doc.sources holds every imported projection source,
+ * not just Sleeper -- checked in order, first match wins, so this works
+ * unchanged if a second source is ever blended in. */
+function rawStatsFor(pid, pos) {
+  for (const src of Object.values(doc.sources || {})) {
+    const row = (src.players || []).find((x) =>
+      x.player_id === pid && x.pos === pos);
+    if (row) return row.stats || null;
+  }
+  return null;
+}
+
+const STAT_ORDER = [
+  "pass_atts", "completions", "pass_yds", "pass_tds", "ints",
+  "rush_atts", "rush_yds", "rush_tds",
+  "receptions", "rec_yds", "rec_tds",
+  "two_pt", "fumbles_lost",
+  "tkl_solo", "tkl_ast", "sacks", "def_ints",
+  "forced_fumbles", "fum_rec", "blocked_kicks", "safeties",
+];
+const STAT_LABELS = {
+  pass_atts: "PASS ATT", completions: "CMP", pass_yds: "PASS YD",
+  pass_tds: "PASS TD", ints: "INT",
+  rush_atts: "RUSH ATT", rush_yds: "RUSH YD", rush_tds: "RUSH TD",
+  receptions: "REC", rec_yds: "REC YD", rec_tds: "REC TD",
+  two_pt: "2PT", fumbles_lost: "FUM LOST",
+  tkl_solo: "TKL SOLO", tkl_ast: "TKL AST", sacks: "SACK", def_ints: "INT",
+  forced_fumbles: "FF", fum_rec: "FR", blocked_kicks: "BLK", safeties: "SFTY",
+};
+
+/* PLAYER tab: the roto projection stat line behind My$, for whoever is
+ * currently staged. Manual tab, never auto-switches on stage (Collin:
+ * staging shouldn't yank you off the board mid-auction) and shows an
+ * empty state rather than the last-viewed player when nothing's staged
+ * (matches how THE BLOCK itself behaves). Position-appropriate columns
+ * fall out for free: sleeper.js only ever writes a stat key into `stats`
+ * when Sleeper actually projected it, so a QB's line simply never has
+ * receiving keys and vice versa -- no per-position column list to
+ * maintain here. */
+function renderPlayerTab() {
+  const el_ = $("#playertab");
+  if (!el_) return;
+  if (!picked) {
+    el_.innerHTML = `<div class="ptab-empty">Stage a player to see their projections.</div>`;
+    return;
+  }
+  const p = picked;
+  const stats = rawStatsFor(p.id, p.pos);
+  const rows = stats
+    ? STAT_ORDER.filter((k) => stats[k] != null)
+      .map((k) => `<tr><td>${STAT_LABELS[k]}</td><td>${stats[k]}</td></tr>`).join("")
+    : "";
+  el_.innerHTML = `
+    <div class="ptab-head">
+      <span class="ptab-name">${escHtml(p.name)}</span>
+      <span class="tm">${p.pos} ${p.team || ""}</span>
+      ${p.pts != null ? `<span class="ptab-pts">${p.pts.toFixed ? p.pts.toFixed(1) : p.pts} pts <small>(this league's scoring)</small></span>` : ""}
+    </div>
+    ${rows
+      ? `<table class="ptab-table"><tbody>${rows}</tbody></table>`
+      : `<div class="ptab-empty">No projection stat line available for ${escHtml(p.name)}.</div>`}`;
+}
+
 function bidFeedHtml() {
   return bidFeed.length
     ? bidFeed.map((b) => `<div class="bf-row">
@@ -1798,10 +1865,11 @@ function renderTeams() {
 }
 
 function applyTab() {
-  const b = $("#board"), t = $("#teams");
-  if (!b || !t) return;
+  const b = $("#board"), t = $("#teams"), pl = $("#playertab");
+  if (!b || !t || !pl) return;
   b.style.display = boardTab === "board" ? "grid" : "none";
   t.style.display = boardTab === "teams" ? "block" : "none";
+  pl.style.display = boardTab === "player" ? "block" : "none";
   document.querySelectorAll(".btab").forEach((x) =>
     x.classList.toggle("on", x.dataset.tab === boardTab));
 }
@@ -2155,6 +2223,7 @@ function selectOwner(oid) {
 
 function updateSummary() {
   renderBlock();
+  renderPlayerTab();
   const ready = picked && selOwner != null
     && parseInt($("#price").value, 10) >= 1;
   $("#sold").disabled = !ready;
@@ -2191,6 +2260,7 @@ function resetSale() {
   if ($("#q")) { $("#q").value = ""; $("#q").focus(); }
   if ($("#msg")) $("#msg").textContent = "";
   renderBlock();
+  renderPlayerTab();
 }
 
 async function commit() {
@@ -2436,10 +2506,12 @@ function renderBoardScreen() {
     <div id="btabs">
       <button class="btab on" data-tab="board">BOARD</button>
       <button class="btab" data-tab="teams">TEAMS</button>
+      <button class="btab" data-tab="player">PLAYER</button>
     </div>
     <div class="boardscroll">
       <div class="cols" id="board"></div>
       <div id="teams" style="display:none"></div>
+      <div id="playertab" style="display:none"></div>
     </div>`;
   layout.appendChild(boardcol);
 
@@ -2532,7 +2604,8 @@ function renderBoardScreen() {
   };
 
   renderBoard(); renderTeams(); renderOwners(); renderRoster();
-  renderChips(); renderFavorites(); renderFlow(); renderBlock(); applyTab();
+  renderChips(); renderFavorites(); renderFlow(); renderBlock();
+  renderPlayerTab(); applyTab();
   /* appended after renderFlow(), which fully overwrites #flow's innerHTML
    * -- adding this earlier gets silently wiped by that call. */
   if (hf && doc.league.sleeper_draft_id) {

@@ -835,3 +835,36 @@ right-aligned, confirmed the rail's old panel and `#bidfeedlist` element
 are both gone, confirmed the feed still reads its existing persisted
 data correctly, confirmed THE BLOCK (and the feed with it) fully hides
 on Escape/unstaging as expected. No console errors. Bumped V72 -> V73.
+
+---
+
+## 2026-09-02 -- New PLAYER tab: the roto stat line behind My$
+
+Grew out of the Sleeper-value investigation above: Collin asked to pull
+the roto projections into a table. Considered putting it inside THE
+BLOCK (a row, or a literal middle column), but recommended against it --
+THE BLOCK already has a lot competing for attention (verdict, hero
+number, roster-fit, reasons, scale, bid feed) and a real stat table
+needs room a squeezed row/column can't give it. Collin proposed a third
+tab instead, which is what got built: a "PLAYER" tab next to BOARD/
+TEAMS, showing whoever is currently staged. Confirmed with two quick
+questions rather than assuming: empty state (not last-viewed player)
+when nothing's staged, and manual tab switching only (staging never
+auto-jumps you off the board mid-auction).
+
+New `rawStatsFor(pid, pos)` looks up the raw roto stat line from
+`doc.sources` -- the same numbers My$ is scored from, just not yet
+converted to points/dollars (engine.js's own output deliberately doesn't
+carry `stats` forward, so this reads from the source data directly
+rather than touching the engine). Position-appropriate columns fall out
+for free: `sleeper.js` only ever writes a stat key when Sleeper actually
+projected it for that position, so there's no per-position column list
+to maintain -- a QB's line simply never has receiving keys and vice
+versa.
+
+Verified live: staged a QB (Brock Purdy) and confirmed a full passing +
+rushing table with no receiving row; staged a WR (Garrett Wilson) and
+confirmed the reverse (receiving + a small rushing package, no passing);
+confirmed the empty state shows correctly with nothing staged; confirmed
+switching to BOARD/TEAMS and back doesn't disturb THE BLOCK above it.
+No console errors. Bumped V73 -> V74.
