@@ -138,6 +138,11 @@ export function pollDraft(draftId, { onPicks, onError, onNomination,
     }
   };
   tick();
-  const timer = setInterval(tick, intervalMs);
-  return () => { stopped = true; clearInterval(timer); };
+  let timer = setInterval(tick, intervalMs);
+  const stop = () => { stopped = true; clearInterval(timer); };
+  /* Force an immediate re-poll instead of waiting out the rest of the
+   * current interval -- for a manual "this looks stale" moment. Resets
+   * the interval from this tick, not a bonus tick squeezed in early. */
+  stop.refresh = () => { clearInterval(timer); tick(); timer = setInterval(tick, intervalMs); };
+  return stop;
 }

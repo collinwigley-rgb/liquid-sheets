@@ -1307,6 +1307,22 @@ function planState() {
 }
 
 /* BeerSheets-style surplus shading (ported, incl. sqrt scale) */
+/* Continuous green -> amber -> red for THE BLOCK's big current-bid number:
+ * how hot the live price is running vs. fair value (My$), not a discrete
+ * good/bad split. ratio 0.7 = full cold (deal), 1.0 = neutral (right at
+ * value), 1.3 = full hot (overpay) -- same per-theme RGB triples as
+ * surplusBg, plus --warn's RGB as the ratio=1.0 midpoint. */
+function bidHeat(ratio) {
+  const dark = (document.documentElement.dataset.theme || "").startsWith("dark");
+  const good = dark ? [102, 189, 143] : [13, 107, 70];
+  const warn = dark ? [214, 180, 90] : [138, 90, 18];
+  const bad = dark ? [224, 133, 99] : [166, 58, 48];
+  const t = Math.max(0, Math.min(1, (ratio - 0.7) / 0.6));
+  const [from, to, u] = t < 0.5 ? [good, warn, t / 0.5] : [warn, bad, (t - 0.5) / 0.5];
+  const c = from.map((v, i) => Math.round(v + (to[i] - v) * u));
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+
 function surplusBg(ourVal, price) {
   const d = (ourVal == null ? 1 : ourVal) - price;
   if (Math.abs(d) < 0.5) return "";
@@ -1943,7 +1959,7 @@ function renderBlock() {
   const p = picked;
   const a = advise(p);
 
-  let scaleRow = "";
+  let scaleRow = "", heroRow = "";
   if (p.usd != null) {
     const group = P.filter((x) => x.pos === p.pos && x.tier === p.tier
       && x.usd != null);
@@ -1983,6 +1999,16 @@ function renderBlock() {
         </div>
         ${heat}
       </div>`;
+    /* "peak" = the top of his own tier's My$ range (hi, above) -- the
+     * highest a comparable player at his position/tier is valued. If
+     * "peak" was meant differently, this is the one guess in this
+     * change; flag it and it's a one-line swap. */
+    if (current != null) {
+      heroRow = `<div class="blk-row blk-hero">
+        <div class="blk-bignum" style="color:${bidHeat(current / target)}">$${current}</div>
+        <div class="blk-refs"><span>FAIR <b>$${target}</b></span><span>PEAK <b>$${Math.round(hi)}</b></span></div>
+      </div>`;
+    }
   }
 
   const ceilLine = a.max < a.worth
@@ -2008,6 +2034,7 @@ function renderBlock() {
         ${ceilLine}
         ${a.est ? `<div class="cest">room bids <b>~$${a.est}</b></div>` : ""}
       </div>
+      ${heroRow}
       ${slotRows ? `<div class="blk-row">${slotRows}</div>` : ""}
       ${a.reasons.length ? `<div class="blk-row"><ul class="blk-reasons">${a.reasons.slice(0, 5).map((r) => `<li>${r}</li>`).join("")}</ul></div>` : ""}
       ${scaleRow}
@@ -2419,6 +2446,13 @@ function renderBoardScreen() {
       "Sleeper draft/mock every 5s. Never writes back to Sleeper.";
     b.onclick = () => toggleLiveSync();
     hf.appendChild(b);
+    const rb = el("button", "ghost tiny", "Refresh");
+    rb.title = liveSyncStop
+      ? "Force an immediate re-poll now, instead of waiting out the rest of the 5s interval."
+      : "Turn on live sync first.";
+    rb.disabled = !liveSyncStop;
+    rb.onclick = () => liveSyncStop?.refresh?.();
+    hf.appendChild(rb);
   }
 }
 

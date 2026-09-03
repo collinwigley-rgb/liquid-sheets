@@ -517,3 +517,34 @@ cache-busting param. The remaining few seconds of visible lag against a
 bot-driven mock nominating rapidly is normal 5s-polling granularity, not
 the 159s CDN staleness bug -- a materially different, expected latency.
 No console errors. Bumped V62 -> V63 with the change.
+
+---
+
+## 2026-09-02 -- Force-refresh button, and a big color-graded current-bid number
+
+Two small asks in a row while Collin kept testing live:
+
+**"I need a force refresh button for stale."** `pollDraft()`'s returned
+stop function now also carries `.refresh()`: clears the existing
+interval, fires an immediate tick, then reschedules from that point (not
+a bonus tick squeezed in on top). New "Refresh" button next to "Live
+sync: ON/OFF" in the masthead, disabled whenever sync is off. Verified
+live: clicked partway through a 5s interval and confirmed via the
+network log that the request fired at the exact click timestamp, then
+resumed a clean 5s cadence from there -- no drift, no duplicate overlap.
+
+**"Current Bid value very large, alongside a reasonable sized fair
+value, peak value, gradient if we're getting HOT."** Added a hero row to
+THE BLOCK: the live bid at 46px, bold, color-graded continuously from
+green (deal) through amber (right at value) to red (overpay) by
+`current / target` -- reusing `surplusBg`'s exact per-theme RGB triples
+for the green/red ends, `--warn`'s RGB as the ratio=1.0 midpoint, linear
+interpolation between them (`bidHeat()`). Beside it, smaller: FAIR
+(target/My$) and PEAK (the top of his own tier's My$ range -- the one
+guess in this change, since "peak value" wasn't otherwise specified;
+flagged to Collin as a one-line swap if he meant something else).
+Verified live at three checkpoints against a real My$ value ($39):
+bid $50 (ratio 1.28) rendered essentially the theme's full "bad" red,
+bid $28 (ratio 0.72) essentially full "good" green, bid $39 (ratio 1.0)
+exactly the theme's `--warn` RGB -- confirms the gradient is centered
+and scaled correctly, not just directionally right. Bumped V63 -> V64.
