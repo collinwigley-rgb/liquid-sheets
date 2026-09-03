@@ -943,3 +943,17 @@ per Collin's earlier flag) -- if a hard refresh doesn't clear it for
 Collin, next step is checking `navigator.serviceWorker.getRegistrations()`
 on his actual device rather than assuming the fix alone is sufficient.
 Bumped V75 -> V76.
+
+---
+
+## 2026-09-03 -- Recent Bids fixed height (was stretching THE BLOCK vertically)
+
+Collin: "can we fix the height to 125. now its forcing ver scale due to
+the rencent bids." Removing `.blk-bidfeed`'s `max-height` in the
+scrollbar fix above let the feed grow to fit however many of the 20
+rows were present, and since it's a flex sibling of `.blk-body` inside
+THE BLOCK, that pushed the whole block taller as bids accumulated.
+Set a fixed `height:125px` (kept `overflow:hidden`, no scrollbar) so
+THE BLOCK's height stays constant regardless of bid count -- once more
+than ~8 rows exist the oldest ones simply clip rather than growing the
+box. Bumped V76 -> V77.
