@@ -771,3 +771,38 @@ comps having averaged roughly $40 My$ themselves ($8 - (-$32) = $40,
 in the right range for mid-tier QBs) -- not just plausible-looking, the
 arithmetic actually ties out. Three stacked hero-row lines render
 cleanly with no layout break, no console errors. Bumped V70 -> V71.
+
+---
+
+## 2026-09-02 -- Fixed: sw.js's own install step was as vulnerable to CDN staleness as the Sleeper fix from earlier today
+
+Collin, on mobile, asked me to verify V71 myself. Did: checked the live
+site's service worker directly and found something worse than a normal
+lag -- `caches.keys()` showed the cache correctly renamed to
+`liquid-sheets-v71` (the version-bump mechanism itself worked), but the
+gear menu still read "V64" and the board showed pre-V65 layout. The
+cache had the right NAME but stale CONTENTS.
+
+Root cause: `install`'s `c.add(u)` is a plain `fetch(u)` with no
+cache-busting, exactly as vulnerable to GitHub Pages' own CDN (Fastly)
+serving a stale edge copy as the Sleeper API calls were before today's
+earlier fix (`live_draft.js`'s `noCacheFetch`) -- confirmed live: a
+fresh `curl` of the same URL right now correctly returns V71 content, so
+the origin is fine; it's specifically what the service worker's install
+fetch received, whenever that install ran, that was stale. Bumping
+`CACHE` guarantees a new install cycle starts; it never guaranteed that
+cycle's own fetches would get fresh bytes.
+
+Fixed the same way as the Sleeper case: added a cache-busting query
+param to each shell file's install-time fetch. `CACHE` itself doubles as
+the buster (already unique per deploy) -- fetched with `?_sw=<CACHE>`,
+stored under the clean URL, so the fetch handler's `caches.match(req)`
+still finds it on normal requests. `{cache: "no-store"}` added too, same
+belt-and-suspenders as the Sleeper fix.
+
+Real-world impact: anyone who loaded the app during an unlucky CDN
+window could be stuck on old content indefinitely, with no way to tell
+from the app itself (the gear menu's version number IS the file that
+was stale). Recovery for anyone already stuck: clear that site's
+browser data (works without devtools, including on mobile) and reload
+-- the fixed install logic then runs clean. Bumped V71 -> V72.
