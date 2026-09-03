@@ -584,3 +584,41 @@ whenever the poll happened to return unchanged data. Added a feedback
 pulse: button reads "..." and disables for 700ms after every click, an
 honest "your click registered" signal, not a claim about the fetch's
 real completion (which isn't awaited here). Bumped V64 -> V65.
+
+---
+
+## 2026-09-02 -- Mock mode no longer blends with the real journal
+
+Collin, with a screenshot: the same WR showed up twice in one roster at
+two different prices, and nearly the whole QB list was crossed out
+against only 13 real Sleeper picks. Stated the actual principle this
+violated: "the app should sync to EXACTLY the sleeper board. it should
+not try and retain out of band."
+
+Root cause: mock mode's fix from earlier today (the mockSales overlay)
+still concatenated with `doc.journal` before the active-sales filter --
+`activeSales(doc.journal.concat(mockSales))`. That was meant to let real
+keepers coexist with a mock rehearsal, but it meant ANY leftover entry
+in the real journal for a player the mock also shows would double him
+up, and any real journal entry the mock's board doesn't currently
+reflect would show as phantom-sold. Collin, asked why the blend was
+even there: no good reason survived -- a mock rehearsal should be a
+clean, isolated mirror of that one Sleeper board, full stop.
+
+Fixed: new `mockActive` flag (true only while polling a mock override).
+`buildModel()` now reads `activeSales(mockActive ? mockSales : doc.journal)`
+-- mock mode shows ONLY the mock's current live picks, real mode is
+unchanged. Also satisfies "if I put a new ID in, it should just align
+with current": since mockSales already fully rebuilds from scratch every
+poll (never appended to), and now nothing else blends in, pointing at a
+new draft or a reset mock self-corrects on the very next tick.
+
+Verified by deliberately reproducing the exact reported bug: manually
+injected a stale `doc.journal` entry for a player also active in a real
+running mock (same pid, an obviously-wrong $999 price), confirmed it
+showed correctly in real mode (sanity check), then enabled mock sync and
+confirmed exactly one row at the mock's real price ($26) -- no
+duplicate, stale entry completely excluded. Confirmed the switch is
+clean both directions (toggling sync off reverts to showing the real
+journal's $999 again) and that `doc.journal` never moved (mock mode
+still writes nothing, ever). Bumped V65 -> V66.

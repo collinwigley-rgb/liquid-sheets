@@ -23,6 +23,8 @@ let doc = null;
 let liveSyncStop = null;   // stop() from pollDraft(), non-null only while live sync is on
 let liveSyncDraftId = null; // overrides doc.league.sleeper_draft_id when set (testing against a mock)
 let liveNomId = null;      // player id live sync currently believes is nominated, or null
+let mockActive = false;    // true only while polling a mock override -- when true, the
+                            // board mirrors ONLY mockSales, never blended with doc.journal
 let mockSales = [];        // ephemeral sale-shaped rows from a MOCK poll, never persisted --
                             // rebuilt fresh every tick, cleared when live sync stops or
                             // switches back to the real draft. See syncDraftPicks.
@@ -733,11 +735,12 @@ function syncNomination(nom) {
 function toggleLiveSync() {
   if (liveSyncStop) {
     liveSyncStop(); liveSyncStop = null; liveNomId = null;
-    if (mockSales.length) { mockSales = []; renderBoardScreen(); }
+    if (mockActive) { mockActive = false; mockSales = []; renderBoardScreen(); }
   } else {
     const override = (liveSyncDraftId || "").trim();
     const draftId = override || doc.league.sleeper_draft_id;
     const isMock = !!override;
+    mockActive = isMock;
     mockSales = [];
     if (draftId) {
       liveSyncStop = pollDraft(draftId, {
@@ -1203,10 +1206,13 @@ function buildModel() {
       doc.league.budget);
     saveDoc(doc);
   }
-  /* mockSales (rehearsal-only, never in doc.journal) concat BEFORE
-   * activeSales: their negative seq numbers never collide with a real
-   * unsale's ref, so they always survive the active-sales filter. */
-  curSales = activeSales(doc.journal.concat(mockSales));
+  /* While mockActive, the board mirrors ONLY the mock's own live picks --
+   * never blended with doc.journal. Collin: "sync to EXACTLY the sleeper
+   * board, should not retain out of band" -- any leftover real-journal
+   * entry for a player the mock also shows would double-count him
+   * (verified live: this exact bug showed the same WR twice in one
+   * roster). Real-draft sync (mockActive false) is unaffected. */
+  curSales = activeSales(mockActive ? mockSales : doc.journal);
   soldSet = new Set(curSales.map((s) => s.pid));
   soldBy = {}; curSales.forEach((s) => { soldBy[s.pid] = s; });
   const mv = doc.market?.values ?? null;
