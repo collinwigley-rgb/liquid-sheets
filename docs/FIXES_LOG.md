@@ -957,3 +957,31 @@ Set a fixed `height:125px` (kept `overflow:hidden`, no scrollbar) so
 THE BLOCK's height stays constant regardless of bid count -- once more
 than ~8 rows exist the oldest ones simply clip rather than growing the
 box. Bumped V76 -> V77.
+
+---
+
+## 2026-09-03 -- Live verification pass (credits restored): budget table + height fix confirmed
+
+Collin: "Dynamic budget is super important to me." Ran a full live check
+against the deployed site (not local) now that credits refreshed,
+closing out both "not yet verified" items from the last two entries.
+
+Confirmed via direct DOM/computed-style inspection on the live page:
+- `.blk-bidfeed` computed height is exactly 125px with `overflow:hidden`
+  and a scrollHeight of 361px -- confirms it's genuinely clipping, not
+  coincidentally short.
+- Per-position budget table renders real numbers (QB/RB/WR/TE/FLX,
+  target/spent/left/%) and, critically, does NOT move when a bid is
+  typed into the price field but not yet committed as a sale (tested by
+  setting the staged player's price to $90 and confirming every row was
+  byte-for-byte unchanged) -- spent/left only reflect real recorded
+  sales, exactly as designed, not a live in-progress bid.
+- Narrow-width check (190% page zoom, simulating an ~820px-wide
+  viewport): THE BLOCK's own content (720px) fits inside the viewport
+  (728px) with no internal overflow. The page DOES horizontally scroll
+  at that width, but tracing it showed the cause is the pre-existing
+  BOARD grid's four price columns, not anything from tonight's block
+  work -- not a regression, not actioned.
+
+No code changes this pass. Closes the two "not yet verified" notes from
+the V75 and V77 entries above.
