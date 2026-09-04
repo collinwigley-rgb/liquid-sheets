@@ -1106,3 +1106,76 @@ Verified: `node --check` clean on all touched/generated files, ASCII-only
 grep clean. Live-tested on a wiped local IndexedDB (fresh Money_Talks
 quick-start) rather than the stale multi-hour test journal accumulated
 earlier tonight, to get a clean signal. Bumped V78 -> V79.
+
+---
+
+## 2026-09-04 -- THE BLOCK: quadrant redesign (range bar removed, budget table fixed)
+
+Collin ran a UX critique on THE BLOCK (screenshot of a Jeremiyah Love
+overpay scenario), asked for a designer's-eye pass broken into quadrants,
+flagged the range bar as "basically useless," and separately flagged the
+budget table as "weird." Ran it through both ux-heuristics and
+refactoring-ui frameworks before touching code, then a "harden it, make
+a plan" pass that traced the actual root causes in advise() and
+budgetByPosition() rather than guessing. Full diagnosis and plan were
+presented and approved before implementation.
+
+**Root causes found (not just symptoms):**
+- The range bar's usable scale (target-to-peak, often a $1-5 spread) had
+  to stretch to fit the bid, so a real overpay crushed the meaningful
+  range into a sliver of the bar's width -- it failed exactly in the
+  scenario it existed to flag.
+- "FAIR VALUE" (a static roster-strategy recommendation, computed from
+  `deal`/scarcity, never looking at the price box) and "TIER RUNNING
+  COLD $-11" (a live reaction to the entered bid) were both styled as
+  same-looking badges in different corners, answering different
+  questions but reading as two verdicts disagreeing.
+- The budget table's TARGET/SPENT/LEFT columns visually implied
+  TARGET - SPENT = LEFT, but they're computed from unrelated formulas
+  (`target` = static per-position plan sum; `left` = live water-fill
+  share of the ENTIRE remaining budget) -- they were never meant to
+  match, so the table looked broken even when working exactly as
+  designed.
+- Injury status was shown twice: inline by the name AND as a reasons
+  bullet.
+
+**Fix -- #theblock is now a 2x2 CSS grid** (plus Recent Bids as a third
+column spanning both rows):
+- **Q1 (who)**: photo, name/pos/team, injury inline, price-paid history.
+- **Q2 (the ask)**: the live colored bid number, FAIR/PEAK/AVG TIER, and
+  now the tier-drift/inflation reasons directly underneath -- one place
+  for everything about the live price. Range bar deleted entirely (its
+  job is fully covered by the colored number + FAIR/PEAK).
+- **Q3 (budget)**: relabeled PLANNED/SPENT/NOW (honest about what NOW
+  actually is), a red delta chip when NOW has moved from a naive
+  planned-minus-spent baseline (`openPlanned`, new field on
+  budgetByPosition's return), a mini bar per row, and the whole row goes
+  red when a position is already spent past its planned target.
+- **Q4 (the roster call)**: verdict badge, worth, roster-fit slot lines,
+  and now the scarcity/comparable/bench-fit reasons -- one place for
+  "should I be pursuing him."
+- `advise()` now returns `priceReasons`/`rosterReasons` split by which
+  question they answer (`reasons` kept as the old combined list,
+  unchanged, for the self-host AI copilot payload's back-compat).
+
+**A real layout bug found and fixed during verification** (not just
+guessed at): `.cslots .srow`'s `justify-content:space-between` was
+written for the old narrow flex row: once Q4 became a much wider flex
+column, it pushed the roster-fit label and value to opposite edges of
+the whole quadrant ("QB" ................ "~$42"). Fixed with
+`align-items:flex-start` on `.blk-q2`/`.blk-q4` so children size to
+content instead of stretching full width.
+
+Verified live end-to-end (local dev, wiped IndexedDB, all four
+quadrants, not just spot-checked): fair-value bid (green $38), real
+overpay (red $70 with tier-drift text correctly in Q2 only, not
+duplicated in Q4), a genuine tier-drift scenario built by actually
+selling a comp under value (not simulated), and a genuine overspend
+built by actually overspending QB by $70 against a $53 plan --
+confirmed the QB row renders fully red (label, numbers, bar) and the
+other positions correctly show red squeeze-chips, matching the dynamic-
+budget mechanic exactly. Narrow-width recheck (same ~820px-equivalent
+zoom test as before): THE BLOCK's own content (720px) still has zero
+internal overflow. No console errors across the whole pass. `node
+--check` clean, ASCII-only grep clean on both touched files. Bumped
+V79 -> V80.

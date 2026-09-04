@@ -1524,14 +1524,20 @@ function planState() {
 function budgetByPosition(ps) {
   const groups = {};
   ["QB", "RB", "WR", "TE", "FLX"].forEach((lab) => {
-    groups[lab] = { target: 0, spent: 0, left: 0 };
+    /* openPlanned: the same open-slots-only set `left` sums, but static
+     * (planned, not eff) -- the honest baseline `left` should be compared
+     * against, since `target` (below) includes already-FILLED slots too
+     * and was never a number `left` could match (2026-09-04, see
+     * renderBlock's budgetRow comment for the full "why does this look
+     * broken" writeup). */
+    groups[lab] = { target: 0, spent: 0, left: 0, openPlanned: 0 };
   });
   ps.slots.forEach((s) => {
     const g = groups[s.lab];
     if (!g) return;
     g.target += s.planned || 0;
     if (s.who) g.spent += s.price || 0;
-    else g.left += s.eff ?? s.planned ?? 0;
+    else { g.left += s.eff ?? s.planned ?? 0; g.openPlanned += s.planned || 0; }
   });
   return groups;
 }
@@ -2026,13 +2032,19 @@ function advise(p) {
   const deal = (doc.market && p.y_avg != null) ? val - p.y_avg * mScale : dealOf(p);
   let worth = val;   /* the displayed value; K/DEF override it with the plan */
   const myMax = oStates().find((o) => o.is_me).max;
-  const reasons = [];
+  /* Split by the question each reason answers (quadrant redesign, ADR-
+   * pending): priceReasons explain the live market/price ("why did the
+   * number move"), rosterReasons explain the roster-strategy verdict
+   * ("should I be pursuing him at all"). injury is deliberately not a
+   * reason here -- it renders once, inline by the player's name, instead
+   * of duplicating there AND in a bullet list. */
+  const priceReasons = [], rosterReasons = [];
   /* Always say WHY the number moved, in plain language -- same principle
    * as every other ceiling/reason in this function (ADR-0011). Only
    * surfaces once the drift is bigger than rounding noise. */
   if (td && Math.abs(Math.round(td.drift)) >= 2) {
     const r = Math.round(td.drift);
-    reasons.push(`tier running ${r > 0 ? "hot" : "cold"} ${r > 0 ? "+" : ""}$${r} vs My$ `
+    priceReasons.push(`tier running ${r > 0 ? "hot" : "cold"} ${r > 0 ? "+" : ""}$${r} vs My$ `
       + `(${td.n} sold ${p.pos}${td.n === 1 ? "" : "s"}${td.sameTier ? "" : ", whole position"}) `
       + `-- worth adjusted from $${rawVal} to $${val}`);
   }
@@ -2070,13 +2082,13 @@ function advise(p) {
       ? Math.max(1, kslot ? (kslot.eff ?? kslot.planned ?? 1) : 1) : 1;
     worth = envK; max = envK; planCap = Math.min(envK, myMax);
     cls = "value"; label = "FAIR VALUE";
-    reasons.push(ps.hasPlan
+    rosterReasons.push(ps.hasPlan
       ? `your budget plan sets ~$${envK} here`
       : "late-round spot; ~$1 is typical unless your plan says otherwise");
   } else if (fit && fit.bench) {
     cls = "pass"; label = "BENCH ONLY"; max = Math.min(2, myMax);
     planCap = Math.max(1, Math.min(ps.benchPer, myMax));
-    reasons.push((ps.benchOpen > 0
+    rosterReasons.push((ps.benchOpen > 0
       ? "no starting slot open for him; bench money ~$" + ps.benchPer
         + " across " + ps.benchOpen + " spot" + (ps.benchOpen === 1 ? "" : "s")
       : "no roster spot open for him")
@@ -2093,7 +2105,7 @@ function advise(p) {
       cls = "pass"; label = "LET HIM GO"; max = Math.min(val, envMax);
     } else if (cliffPressure) {
       cls = "last"; label = "LAST CHANCE"; max = val;
-      reasons.push(`only ${comparable} comparable ${p.pos}${comparable === 1 ? "" : "s"} left`
+      rosterReasons.push(`only ${comparable} comparable ${p.pos}${comparable === 1 ? "" : "s"} left`
         + (drop != null ? ` before a $${drop} drop` : "")
         + ` and ${contest} funded owners still need one; paying full value is correct here`);
     } else if (deal != null && deal >= 2) {
@@ -2102,19 +2114,18 @@ function advise(p) {
       cls = "value"; label = "FAIR VALUE"; max = Math.min(val, envMax);
     }
     if (flexOnly) {
-      reasons.push(`your ${p.pos} is filled; he only fits your FLX, or bench`);
+      rosterReasons.push(`your ${p.pos} is filled; he only fits your FLX, or bench`);
     }
     if (comparable != null && !cliffPressure) {
-      reasons.push(`${comparable} comparable ${p.pos}${comparable === 1 ? "" : "s"} left, `
+      rosterReasons.push(`${comparable} comparable ${p.pos}${comparable === 1 ? "" : "s"} left, `
         + `${contest} funded owner${contest === 1 ? "" : "s"} fighting for them`);
     }
   }
   if (inf.ratio > 1.1) {
-    reasons.push(`money-rich room (x${inf.ratio.toFixed(2)}): expect ~${Math.round((inf.ratio - 1) * 100)}% overpays`);
+    priceReasons.push(`money-rich room (x${inf.ratio.toFixed(2)}): expect ~${Math.round((inf.ratio - 1) * 100)}% overpays`);
   } else if (inf.ratio < 0.9) {
-    reasons.push(`money drying up (x${inf.ratio.toFixed(2)}): patience is being paid`);
+    priceReasons.push(`money drying up (x${inf.ratio.toFixed(2)}): patience is being paid`);
   }
-  if (p.inj) reasons.push("injury status: " + p.inj);
   /* when the actionable ceiling sits below his value, say WHY in plain words
    * rather than a bare "capped": it is either his roster fit or your budget */
   const finalMax = Math.max(1, Math.min(max, myMax));
@@ -2126,7 +2137,8 @@ function advise(p) {
       : "your plan's room for this slot";
   }
   return { cls, label, max: finalMax, worth, ceilWhy,
-    planCap, benchPer: ps.benchPer, benchOpen: ps.benchOpen, est, reasons,
+    planCap, benchPer: ps.benchPer, benchOpen: ps.benchOpen, est,
+    reasons: [...priceReasons, ...rosterReasons], priceReasons, rosterReasons,
     elig, td };
 }
 
@@ -2196,14 +2208,12 @@ function headshotUrl(p) {
 }
 
 /* THE BLOCK: the single decision cockpit for whoever is currently
- * staged/nominated -- identity+photo, THE CALL's verdict/worth/roster-fit/
- * reasons (formerly a separate rail panel, now folded in here so there is
- * one place to look instead of several), and his tier's price range with
- * target (My$) vs current (live bid) markers plus tier hot/cold. A
- * vertical stack of .blk-rows (see #theblock in index.html for the layout
- * contract) so more can be appended later without redoing the container.
- * Reads existing staging state (picked, #price) and advise()'s existing
- * verdict logic; adds no new persisted state. */
+ * staged/nominated. A 2x2 quadrant grid (see #theblock in index.html for
+ * the full layout contract and why) -- Q1 who he is, Q2 the live bid vs
+ * his value, Q3 the budget impact, Q4 the roster-strategy verdict, plus
+ * Recent Bids spanning both rows on the right. Reads existing staging
+ * state (picked, #price) and advise()'s existing verdict logic; adds no
+ * new persisted state. */
 function renderBlock() {
   const block = $("#theblock");
   if (!block) return;
@@ -2212,91 +2222,75 @@ function renderBlock() {
   const a = advise(p);
   const hist = historyHtml(p.id);
   const histRow = hist
-    ? `<div class="blk-row blk-hist" title="what he actually sold for in past Money_Talks seasons; orange K = kept at that price, not auctioned">${hist}</div>`
+    ? `<div class="blk-hist" title="what he actually sold for in past Money_Talks seasons; orange K = kept at that price, not auctioned">${hist}</div>`
     : "";
 
-  let scaleRow = "", heroRow = "";
+  /* Q2 (THE ASK): the live bid, colored by how it compares to worth, plus
+   * FAIR/PEAK/AVG TIER context. The old range bar (target-to-peak scale
+   * with a bid tick) is gone -- its usable range collapsed to a sliver
+   * whenever a bid ran well past peak, which is exactly the case it most
+   * needed to communicate clearly (2026-09-04 quadrant redesign, Collin:
+   * "I hate the range bar... seems basically useless"). Same for the old
+   * "TIER RUNNING COLD" badge here -- it duplicated the tier-drift
+   * sentence advise() already puts in priceReasons below; one signal, not
+   * two disagreeing-looking ones. */
+  let heroRow = "";
   if (p.usd != null) {
     const group = P.filter((x) => x.pos === p.pos && x.tier === p.tier
       && x.usd != null);
-    const vals = group.map((x) => x.usd);
-    let lo = Math.min(...vals), hi = Math.max(...vals);
-    /* Shift the whole range by the same tier drift as the target (a.worth,
-     * from advise() below) -- otherwise an adjusted target can land
-     * outside a range that's still showing pre-draft numbers, which reads
-     * as broken rather than "this tier got recalibrated." */
-    if (a.td) { lo += a.td.drift; hi += a.td.drift; }
-    if (lo === hi) { lo -= 1; hi += 1; }
+    let hi = Math.max(...group.map((x) => x.usd));
+    if (a.td) hi += a.td.drift;
     const target = a.worth;
     const rawPrice = parseInt($("#price")?.value, 10);
     const current = rawPrice >= 1 ? rawPrice : null;
-    const pct = (v) => Math.max(0, Math.min(100,
-      ((v - lo) / (hi - lo)) * 100)).toFixed(1);
-    /* The tick itself stays at the exact value (pct); the label text is
-     * clamped inward so it never sits flush against $lo/$hi's own text at
-     * the container edge -- issue #9: "target" and the end-label collide
-     * when his My$ IS the tier's min/max. */
-    const labelPct = (v) => Math.max(7, Math.min(93, parseFloat(pct(v))));
-
-    const td = a.td;
-    let heat = `<span class="blk-heat" title="no sales yet at this position to compare against">no comps yet</span>`;
-    if (td) {
-      const r = Math.round(td.drift);
-      const cls = r >= 2 ? "hot" : r <= -2 ? "cold" : "";
-      const lab = r >= 2 ? `TIER RUNNING HOT +$${r}`
-        : r <= -2 ? `TIER RUNNING COLD $${r}` : `TIER STEADY ${r >= 0 ? "+" : ""}$${r}`;
-      heat = `<span class="blk-heat ${cls}" title="${td.n} sold ${p.pos}${td.n === 1 ? "" : "s"}${td.sameTier ? " at this tier" : " (no tier sales yet, using the whole position)"}, averaging $${r >= 0 ? "+" : ""}${r} vs My$">${lab}</span>`;
-    }
-    scaleRow = `<div class="blk-row">
-        <div class="blk-scale" title="his tier's My\$ range: $${Math.round(lo)} - $${Math.round(hi)}">
-          <span class="blk-endlab">$${Math.round(lo)}</span>
-          <div class="blk-track-wrap">
-            <div class="blk-track"></div>
-            <div class="blk-mark target" style="left:${pct(target)}%"></div>
-            <span class="blk-marklab" style="left:${labelPct(target)}%">target $${target}</span>
-            ${current != null ? `<div class="blk-mark current" style="left:${pct(current)}%"></div>
-            <span class="blk-marklab bid" style="left:${labelPct(current)}%">bid $${current}</span>` : ""}
-          </div>
-          <span class="blk-endlab">$${Math.round(hi)}</span>
-        </div>
-        ${heat}
-      </div>`;
     /* "peak" = the top of his own tier's My$ range (hi, above) -- the
-     * highest a comparable player at his position/tier is valued. If
-     * "peak" was meant differently, this is the one guess in this
-     * change; flag it and it's a one-line swap. */
+     * highest a comparable player at his position/tier is valued. */
     if (current != null) {
-      heroRow = `<div class="blk-row blk-hero">
+      heroRow = `<div class="blk-hero">
         <div class="blk-bignum" style="color:${bidHeat(current / target)}">$${current}</div>
         <div class="blk-refs"><span>FAIR <b>$${target}</b></span><span>PEAK <b>$${Math.round(hi)}</b></span>${a.td
           ? `<span title="${a.td.n} sold ${p.pos}${a.td.n === 1 ? "" : "s"}${a.td.sameTier ? " at this tier" : " (whole position)"}">AVG TIER <b>$${Math.round(a.td.avgPrice)}</b></span>` : ""}</div>
       </div>`;
     }
   }
+  const priceReasonsHtml = a.priceReasons.length
+    ? `<ul class="blk-reasons">${a.priceReasons.slice(0, 5).map((r) => `<li>${r}</li>`).join("")}</ul>` : "";
 
-  /* Position budget roll-up: see budgetByPosition's doc comment for why
-   * this is a sum of existing slot-level state, not new budget math. */
+  /* Q3 (BUDGET): a position's LEFT can differ a lot from TARGET even with
+   * $0 spent there -- LEFT is the live water-fill's share of your WHOLE
+   * remaining budget, TARGET is just that position's own static plan
+   * envelope, so they were never meant to sum (2026-09-04: Collin flagged
+   * this table as "weird" -- diagnosed as the columns silently implying
+   * TARGET - SPENT = LEFT when they're computed from unrelated formulas).
+   * Fix: relabel PLANNED/SPENT/NOW, and show the live squeeze/boost as an
+   * explicit delta chip instead of a silent mismatch. openPlanned (from
+   * budgetByPosition) is the same open-slots-only baseline LEFT is the
+   * live version of, so the delta is apples to apples. */
   const ps = planState();
   let budgetRow = "";
   if (ps.hasPlan) {
     const groups = budgetByPosition(ps);
-    const totalTarget = Object.values(groups)
-      .reduce((s, g) => s + g.target, 0);
     const rows = ["QB", "RB", "WR", "TE", "FLX"].map((lab) => {
       const g = groups[lab];
-      const pct = totalTarget > 0 ? Math.round(g.target / totalTarget * 100) : 0;
-      return `<tr><td class="${posClass(lab)}">${lab}</td>
+      const delta = Math.round(g.left - g.openPlanned);
+      const deltaChip = Math.abs(delta) >= 2
+        ? `<b class="bud-delta ${delta < 0 ? "down" : "up"}" title="${delta < 0 ? "shrunk" : "grown"} from plan -- spending elsewhere is ${delta < 0 ? "squeezing" : "freeing up"} this position's live budget">${delta > 0 ? "+" : ""}${delta}</b>`
+        : "";
+      const overspent = g.spent > g.target;
+      const barMax = Math.max(g.target, g.spent + g.left, 1);
+      const spentPct = Math.min(100, Math.round(g.spent / barMax * 100));
+      return `<tr class="${overspent ? "bud-over" : ""}">
+        <td class="${posClass(lab)}">${lab}</td>
         <td>${fmt$(g.target)}</td>
         <td>${g.spent ? fmt$(g.spent) : "-"}</td>
-        <td>~${fmt$(g.left)}</td>
-        <td>${pct}%</td></tr>`;
+        <td>~${fmt$(g.left)}${deltaChip}</td>
+        <td><div class="bud-bar" title="${overspent ? "already over this position's planned target" : "spent vs. planned+available"}"><div class="bud-bar-fill" style="width:${spentPct}%"></div></div></td>
+      </tr>`;
     }).join("");
-    budgetRow = `<div class="blk-row">
-      <table class="blk-budget" title="target: your plan's envelope per position, summed across its slots (e.g. RB1+RB2). spent/left reflect real sales and the plan's live water-fill -- overspending one open slot already shrinks what the others get. Percent is target vs your total starting-roster budget (bench/K/DEF excluded).">
-        <thead><tr><th></th><th>TARGET</th><th>SPENT</th><th>LEFT</th><th>%</th></tr></thead>
+    budgetRow = `<table class="blk-budget" title="planned: your plan's envelope per position, summed across its slots. spent: real sales. now: live water-fill for what's still open -- overspending one open slot already shrinks what the others get, shown here as the +/- chip. Red row = already spent past plan.">
+        <thead><tr><th></th><th>PLANNED</th><th>SPENT</th><th>NOW</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
-      </table>
-    </div>`;
+      </table>`;
   }
 
   const ceilLine = a.max < a.worth
@@ -2308,26 +2302,36 @@ function renderBlock() {
     : (POSITIONS.includes(p.pos) && a.benchOpen > 0 && a.benchPer > 0
       ? `<div class="cslots"><div class="srow"><span class="lab">BN</span>
          <span class="pl">~${fmt$(a.benchPer)}</span></div></div>` : "");
+  const rosterReasonsHtml = a.rosterReasons.length
+    ? `<ul class="blk-reasons">${a.rosterReasons.slice(0, 5).map((r) => `<li>${r}</li>`).join("")}</ul>` : "";
 
   const photo = headshotUrl(p);
   block.innerHTML = `
-    ${photo
-      ? `<img class="blk-photo" src="${photo}" alt="" onerror="this.onerror=null;this.removeAttribute('src');this.classList.add('blk-photo-empty')">`
-      : `<div class="blk-photo blk-photo-empty"></div>`}
-    <div class="blk-body">
-      <div class="blk-row">
+    <div class="blk-q1">
+      ${photo
+        ? `<img class="blk-photo" src="${photo}" alt="" onerror="this.onerror=null;this.removeAttribute('src');this.classList.add('blk-photo-empty')">`
+        : `<div class="blk-photo blk-photo-empty"></div>`}
+      <div class="blk-q1-info">
         <div class="blk-name">${p.name}<span class="tm">${p.pos} ${p.team || ""}</span>${p.inj ? `<span class="inj">${p.inj}</span>` : ""}</div>
+        ${histRow}
+      </div>
+    </div>
+    <div class="blk-q2">
+      ${heroRow}
+      ${priceReasonsHtml}
+    </div>
+    <div class="blk-q3">
+      ${budgetRow}
+    </div>
+    <div class="blk-q4">
+      <div class="blk-verdict-row">
         <span class="cverdict ${a.cls}">${a.label}</span>
         <div class="cmax" title="my value for this player: the break-even. Past this you provably overpaid.">worth <b>$${a.worth}</b></div>
         ${ceilLine}
         ${a.est ? `<div class="cest">room bids <b>~$${a.est}</b></div>` : ""}
       </div>
-      ${histRow}
-      ${heroRow}
-      ${budgetRow}
-      ${slotRows ? `<div class="blk-row">${slotRows}</div>` : ""}
-      ${a.reasons.length ? `<div class="blk-row"><ul class="blk-reasons">${a.reasons.slice(0, 5).map((r) => `<li>${r}</li>`).join("")}</ul></div>` : ""}
-      ${scaleRow}
+      ${slotRows}
+      ${rosterReasonsHtml}
     </div>
     <div class="blk-bidfeed" title="the last 20 live bids seen (team + amount), newest on top. Only sees whatever changed between polls, not every increment.">
       <div class="blk-bidfeed-hd">Recent Bids</div>
