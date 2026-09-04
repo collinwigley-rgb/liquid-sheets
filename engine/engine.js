@@ -171,7 +171,7 @@ export function gapTiers(vbds, theta) {
 }
 
 /* sourcesMap: ordered {name: {as_of, players: [{player_id,pos,team,stats}]}}.
- * Averages each stat across sources; records per-player source spread
+ * Averages each stat across sources; records per-player-position source spread
  * (max minus min of per-source scored points). */
 export function blendProjections(sourcesMap, scoring, exclude = []) {
   const perPlayer = new Map();
@@ -180,14 +180,16 @@ export function blendProjections(sourcesMap, scoring, exclude = []) {
     if (exclude.includes(src)) continue;
     dates.push(`${src}@${data.as_of}`);
     for (const p of data.players) {
-      if (!perPlayer.has(p.player_id)) {
-        perPlayer.set(p.player_id, { pos: p.pos, team: p.team, lines: [] });
+      const key = `${p.player_id}|${p.pos}`;
+      if (!perPlayer.has(key)) {
+        perPlayer.set(key, { player_id: p.player_id,
+          pos: p.pos, team: p.team, lines: [] });
       }
-      perPlayer.get(p.player_id).lines.push(p.stats);
+      perPlayer.get(key).lines.push(p.stats);
     }
   }
   const out = [];
-  for (const [pid, d] of perPlayer) {
+  for (const d of perPlayer.values()) {
     const keys = new Set();
     for (const l of d.lines) for (const k of Object.keys(l)) keys.add(k);
     const avg = {};
@@ -198,7 +200,7 @@ export function blendProjections(sourcesMap, scoring, exclude = []) {
     }
     const pts = d.lines.map((l) => scoreStatLine(d.pos, l, scoring));
     out.push({
-      player_id: pid, pos: d.pos, team: d.team, stats: avg,
+      player_id: d.player_id, pos: d.pos, team: d.team, stats: avg,
       spread: pts.length > 1
         ? round1(Math.max(...pts) - Math.min(...pts))
         : null,
