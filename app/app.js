@@ -893,7 +893,11 @@ function makeFantasyEngineSource() {
  * accidentally average Rotowire back into FantasyEngine's consensus. */
 function sourcesForRun() {
   const sources = doc.sources || {};
-  if (!isMoneyTalksLeague() || !sources.fantasyengine) return sources;
+  if (!sources.fantasyengine) return sources;
+  if (!isMoneyTalksLeague()) {
+    return Object.fromEntries(Object.entries(sources)
+      .filter(([name]) => name !== "fantasyengine"));
+  }
   const covered = new Set((sources.fantasyengine.players || [])
     .map((p) => p.player_id));
   const out = { fantasyengine: sources.fantasyengine };
