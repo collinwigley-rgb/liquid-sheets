@@ -1179,3 +1179,108 @@ zoom test as before): THE BLOCK's own content (720px) still has zero
 internal overflow. No console errors across the whole pass. `node
 --check` clean, ASCII-only grep clean on both touched files. Bumped
 V79 -> V80.
+
+---
+
+## 2026-09-04 -- PLAYER tab: FantasyEngine consensus projections + real season actuals
+
+Collin: "In the player tab I want more data... all the critical stats
+for a player that are used for scoring fantasy points... Projections at
+the top row. Break. Actuals in a second table." Then, mid-build:
+"We have the historical data in our DB, and the various sites
+projections... All my prices need to be wired up... It's critical that
+[FantasyEngine is] connected. This is a core concept." Draft day, ~13
+hours out -- investigated thoroughly before writing anything, since a
+bad player-identity join here would silently corrupt real auction
+numbers.
+
+**What "our DB" actually is** (measured, not assumed): FantasyEngine's
+production system is native PostgreSQL behind an authenticated API
+(`https://fantasyengine.ryoshu.com`), NOT the local SQLite files under
+`C:\_FantasyEngine\data\` (those are explicitly documented in
+FantasyEngine's own README/CLAUDE.md as "archived local fixtures... not
+application state"). Nearly wired this up against stale fixture data
+before catching that.
+
+**The real, live, usable path**: FantasyEngine publishes a genuine
+public, unauthenticated API (`_Documentation/Public_Data_Contract.md`)
+specifically for exactly this kind of external consumption --
+`GET /api/v1/public/stats?dataset=projection_summary&season=2026`
+returns 1257 rows of real multi-site consensus projections, current
+release published 2026-08-30 (5 days old). Verified live:
+- No CORS headers on real responses -- can't be fetched from the
+  deployed static site's browser at runtime. Baked in at build time
+  instead, same pattern as money_talks_config.js/player_history.js, not
+  a new architecture.
+- Public rows are keyed by FantasyEngine's own internal player UUID, not
+  a Sleeper ID -- the public API has no crosswalk. Found one anyway: the
+  local `C:\_FantasyEngine\data\fantasy_2026.db`'s `player_key` table
+  has `sleeper_id, name, position, team` (12,470 rows, 6,362 with a real
+  sleeper_id, current enough to include 2026 rookies) -- a legacy MFL-
+  era crosswalk, but identity mappings are stable even when the fixture
+  file itself is archived, unlike projection numbers which need real
+  freshness.
+- The real page-size cap is 200, not the 500 the doc states (a 500
+  request 400s) -- trusted the live system over the doc.
+- Actual max limit doc drift noted for whoever reads this next: the
+  Public_Data_Contract.md says 500, live API enforces 200.
+
+**New `scripts/generate_fantasyengine_projections.mjs`**: joins
+projection_summary rows onto player_key via normalized name+position
+(team checked only as a non-blocking confidence signal, since
+player_key uses legacy 3-letter codes like TBB/SFO/LVR vs the published
+data's modern TB/SF/LV for the same teams -- verified this is a pure
+naming-convention difference, not a real mismatch, by cross-checking 15
+examples). Ambiguous name+position collisions (2+ crosswalk candidates)
+are dropped, never guessed -- mirrors FantasyEngine's own internal
+"quarantine ambiguous matches" discipline, applied one level up since
+the public API doesn't expose their canonical identity resolution.
+Result: 1206/1257 matched cleanly (96%), 8 genuine name collisions
+correctly dropped (real duplicate NFL names, e.g. two Byron Youngs, two
+Chris Joneses), 43 unmatched (mostly deep-bench IDP rookies/UDFAs not
+yet in the local crosswalk). Output: `app/fantasyengine_projections.js`
+(254KB, keyed by sleeper_id).
+
+**New `scripts/generate_actual_stats.mjs`**: real per-season stat
+totals, 2021-2025, from Sleeper's own `/v1/stats/nfl/regular/<season>`
+-- Sleeper-ID-native, zero join risk (unlike the FantasyEngine
+projections), and verified to use the identical raw key vocabulary
+sleeper.js's STAT_MAP/IDP_STAT_MAP already expect. Output:
+`app/actual_stats.js` (548KB, 3172 players across 5 seasons).
+
+**PLAYER tab rewritten**: `renderPlayerTab()` now renders two tables.
+PROJECTIONS (top) prefers FantasyEngine's consensus when the player
+matched, falls back to the existing Sleeper-sourced rawStatsFor when he
+didn't (never silently blended -- the source is labeled inline, e.g.
+"(FantasyEngine consensus)" vs "(Sleeper (Rotowire))"). ACTUALS (second
+table, below a visual break) shows one column per season the player has
+a real line for, rows in the same STAT_ORDER as projections so the two
+tables compare like for like. Both tables are built from STAT_ORDER's
+existing critical-scoring-category list only -- FantasyEngine's own
+complementary categories (rec_100_yds, pass_300_yds, idp_pd, idp_td,
+...) exist in the raw data but are deliberately left unmapped for now,
+per Collin's own explicit sequencing ("First.. then the option to start
+adding in complementary stats").
+
+Also closes another offline-reliability gap while touching sw.js: the
+two new generated files are statically imported by app.js and were
+missing from SHELL, same all-or-nothing-module-graph risk fixed for
+live_draft.js/money_talks_config.js earlier tonight.
+
+Verified live end-to-end (wiped IndexedDB, local dev server): Bo Nix
+(clean match both tables, real 2024/2025 actuals matching a direct API
+check byte-for-byte), Travis Hunter (a genuinely instructive edge case
+-- his WR-position row matched FantasyEngine cleanly while his DB-
+position row correctly did not, because FantasyEngine's own consensus
+simply doesn't carry a DB row for him; not a join bug, confirmed by
+reading their actual published data). No console errors. `node --check`
+clean on all six touched/generated files, ASCII-only grep clean.
+Bumped V80 -> V81.
+
+**Not done tonight, by design**: this does NOT touch the board's actual
+My$ valuation pipeline (still Sleeper/Rotowire-sourced, unchanged) --
+that was explicitly discussed and deferred as too high-risk to swap
+blind ~13 hours from a real draft. FantasyEngine's consensus is
+reference data in the PLAYER tab only for now. If My$ itself should
+pull from FantasyEngine, that is a deliberate, separate, larger change
+requiring its own validation pass, not a fast-follow to this one.

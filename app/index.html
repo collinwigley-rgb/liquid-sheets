@@ -635,6 +635,18 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
 .ptab-table td{padding:5px 16px 5px 0;border-bottom:1px solid var(--line-soft)}
 .ptab-table td:first-child{color:var(--faint);letter-spacing:.08em}
 .ptab-table td:last-child{font-weight:700;text-align:right}
+.ptab-sechd{font-size:11px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--faint);margin:14px 0 6px}
+.ptab-sechd:first-of-type{margin-top:0}
+.ptab-sechd small{font-weight:400;text-transform:none;letter-spacing:0;
+  color:var(--faint);font-family:var(--ui)}
+.ptab-break{border-top:1px solid var(--line-soft);margin:16px 0}
+.ptab-actuals th{color:var(--faint);font-weight:400;text-align:right;
+  padding:0 16px 4px 0;font-size:11px;letter-spacing:.06em}
+.ptab-actuals th:first-child{text-align:left}
+.ptab-actuals td{text-align:right}
+.ptab-actuals td:first-child{text-align:left;color:var(--faint);font-weight:400}
+.ptab-actuals td:last-child{font-weight:400}
 .ptab-hist{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;
   font-family:var(--mono);font-size:12px;color:var(--muted)}
 #teams{background:var(--ground);padding:10px;overflow-x:auto}
@@ -937,7 +949,7 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
       <button id="menuSleeper" class="gact">Import Sleeper values</button>
       <button id="menuReset" class="gact gdanger">Clear all sales</button>
       <div class="gdiv"></div>
-      <div class="ver gver">V80</div>
+      <div class="ver gver">V81</div>
     </div>
   </span>
 </header>

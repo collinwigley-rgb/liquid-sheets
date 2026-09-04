@@ -19,6 +19,8 @@ import { AI_ENABLED, AI_ENDPOINT } from "./config.js";
 import { MONEY_TALKS_LEAGUE } from "./money_talks_config.js";
 import { pollDraft, fetchDraftStatus, parseDraftId } from "./live_draft.js";
 import { PLAYER_HISTORY } from "./player_history.js";
+import { FANTASYENGINE_PROJECTIONS } from "./fantasyengine_projections.js";
+import { ACTUAL_STATS } from "./actual_stats.js";
 
 let doc = null;
 let liveSyncStop = null;   // stop() from pollDraft(), non-null only while live sync is on
@@ -809,6 +811,14 @@ function historyHtml(pid) {
     + `${r.keeper ? `<b class="hist-k" title="kept at this price, not auctioned">K</b>` : ""}</span>`).join("");
 }
 
+/* The critical stat categories used to actually score fantasy points in
+ * this league (Collin: "all the critical stats... used for scoring
+ * fantasy points. First.. then the option to start adding in
+ * complementary stats") -- both the PROJECTIONS and ACTUALS tables below
+ * are built from this single list, so the two tables always compare like
+ * for like. Complementary/bonus categories (e.g. FantasyEngine's
+ * rec_100_yds, pass_300_yds, idp_pd) exist in the raw sources but are
+ * deliberately left out for now -- a later, additive pass, not this one. */
 const STAT_ORDER = [
   "pass_atts", "completions", "pass_yds", "pass_tds", "ints",
   "rush_atts", "rush_yds", "rush_tds",
@@ -827,15 +837,62 @@ const STAT_LABELS = {
   forced_fumbles: "FF", fum_rec: "FR", blocked_kicks: "BLK", safeties: "SFTY",
 };
 
-/* PLAYER tab: the roto projection stat line behind My$, for whoever is
- * currently staged. Manual tab, never auto-switches on stage (Collin:
- * staging shouldn't yank you off the board mid-auction) and shows an
- * empty state rather than the last-viewed player when nothing's staged
- * (matches how THE BLOCK itself behaves). Position-appropriate columns
- * fall out for free: sleeper.js only ever writes a stat key into `stats`
- * when Sleeper actually projected it, so a QB's line simply never has
- * receiving keys and vice versa -- no per-position column list to
- * maintain here. */
+/* FantasyEngine's projection_summary uses its own raw key names (a third
+ * vocabulary, distinct from both Sleeper's and this app's STAT_ORDER --
+ * verified live 2026-09-04 against real rows) -- same-name keys pass
+ * through unchanged, everything else needs the explicit map below. Only
+ * the STAT_ORDER-relevant keys are mapped; FantasyEngine's own
+ * complementary categories (rec_100_yds, pass_300_yds, idp_pd, idp_td,
+ * rec_first_down, ...) are left unmapped on purpose, same reasoning as
+ * STAT_ORDER's own comment above. */
+const FE_STAT_MAP = {
+  pass_att: "pass_atts", pass_comp: "completions", pass_int: "ints",
+  rush_att: "rush_atts", rec: "receptions",
+  idp_solo: "tkl_solo", idp_asst: "tkl_ast", idp_sack: "sacks",
+  idp_int: "def_ints", idp_fum_force: "forced_fumbles",
+};
+const FE_SAME_KEYS = ["pass_yds", "pass_tds", "rush_yds", "rush_tds",
+  "rec_yds", "rec_tds", "fumbles_lost", "fum_rec"];
+
+/* FantasyEngine's real multi-site consensus projection (2026, current
+ * release -- see scripts/generate_fantasyengine_projections.mjs), mapped
+ * onto STAT_ORDER's schema. null if this player wasn't in the matched
+ * set (unmatched/ambiguous name, or a position FantasyEngine doesn't
+ * project) -- callers fall back to rawStatsFor in that case, never a
+ * silent blend of the two sources. */
+function fantasyEngineStatsFor(pid) {
+  const m = /^sl:(\d+)$/.exec(pid);
+  const row = m && FANTASYENGINE_PROJECTIONS[m[1]];
+  if (!row) return null;
+  const line = {};
+  for (const [theirs, ours] of Object.entries(FE_STAT_MAP)) {
+    if (row.stats[theirs] != null) line[ours] = row.stats[theirs];
+  }
+  for (const k of FE_SAME_KEYS) {
+    if (row.stats[k] != null) line[k] = row.stats[k];
+  }
+  return Object.keys(line).length ? line : null;
+}
+
+/* Real per-season stat totals, 2021-2025 (see scripts/generate_actual_
+ * stats.mjs), already on STAT_ORDER's schema -- {year: {statKey: value}}
+ * for whichever seasons this player actually has a relevant line in. */
+function actualsFor(pid) {
+  const m = /^sl:(\d+)$/.exec(pid);
+  return m ? (ACTUAL_STATS[m[1]] || null) : null;
+}
+
+const fmtStat = (v) => Math.round(v);
+
+/* PLAYER tab: two tables for whoever is currently staged -- projections
+ * on top (FantasyEngine's real multi-site consensus when he's in the
+ * matched set, Sleeper's own roto projection otherwise; either way the
+ * source is labeled, never blended silently), then actuals below,
+ * stack-ranked by STAT_ORDER with one column per season he has a real
+ * line for (Collin: "stack ranked stats, grouped by year column").
+ * Manual tab, never auto-switches on stage (Collin: staging shouldn't
+ * yank you off the board mid-auction) and shows an empty state rather
+ * than the last-viewed player when nothing's staged (matches THE BLOCK). */
 function renderPlayerTab() {
   const el_ = $("#playertab");
   if (!el_) return;
@@ -844,12 +901,40 @@ function renderPlayerTab() {
     return;
   }
   const p = picked;
-  const stats = rawStatsFor(p.id, p.pos);
+  const feStats = fantasyEngineStatsFor(p.id);
+  const stats = feStats || rawStatsFor(p.id, p.pos);
+  const projSource = feStats ? "FantasyEngine consensus" : (stats ? "Sleeper (Rotowire)" : null);
   const hist = historyHtml(p.id);
-  const rows = stats
+
+  const projRows = stats
     ? STAT_ORDER.filter((k) => stats[k] != null)
-      .map((k) => `<tr><td>${STAT_LABELS[k]}</td><td>${stats[k]}</td></tr>`).join("")
+      .map((k) => `<tr><td>${STAT_LABELS[k]}</td><td>${fmtStat(stats[k])}</td></tr>`).join("")
     : "";
+  const projHtml = projRows
+    ? `<div class="ptab-sechd">Projections, 2026 <small>(${projSource})</small></div>
+       <table class="ptab-table"><tbody>${projRows}</tbody></table>`
+    : `<div class="ptab-empty">No projection stat line available for ${escHtml(p.name)}.</div>`;
+
+  const actuals = actualsFor(p.id);
+  let actualsHtml = "";
+  if (actuals) {
+    const years = Object.keys(actuals).map(Number).sort((a, b) => a - b);
+    const relevantKeys = STAT_ORDER.filter((k) => years.some((y) => actuals[y][k] != null));
+    if (relevantKeys.length) {
+      const head = `<tr><th></th>${years.map((y) => `<th>'${String(y).slice(2)}</th>`).join("")}</tr>`;
+      const body = relevantKeys.map((k) => {
+        const cells = years.map((y) => {
+          const v = actuals[y][k];
+          return `<td>${v != null ? fmtStat(v) : "-"}</td>`;
+        }).join("");
+        return `<tr><td>${STAT_LABELS[k]}</td>${cells}</tr>`;
+      }).join("");
+      actualsHtml = `<div class="ptab-break"></div>
+        <div class="ptab-sechd">Actuals by season</div>
+        <table class="ptab-table ptab-actuals"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+    }
+  }
+
   el_.innerHTML = `
     <div class="ptab-head">
       <span class="ptab-name">${escHtml(p.name)}</span>
@@ -857,9 +942,8 @@ function renderPlayerTab() {
       ${p.pts != null ? `<span class="ptab-pts">${p.pts.toFixed ? p.pts.toFixed(1) : p.pts} pts <small>(this league's scoring)</small></span>` : ""}
     </div>
     ${hist ? `<div class="ptab-hist" title="what he actually sold for in past Money_Talks seasons; orange K = kept at that price, not auctioned">${hist}</div>` : ""}
-    ${rows
-      ? `<table class="ptab-table"><tbody>${rows}</tbody></table>`
-      : `<div class="ptab-empty">No projection stat line available for ${escHtml(p.name)}.</div>`}`;
+    ${projHtml}
+    ${actualsHtml}`;
 }
 
 function bidFeedHtml() {
