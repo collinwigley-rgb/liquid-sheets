@@ -3321,6 +3321,7 @@ async function boot() {
     if (!importInput.files.length) return;
     try {
       doc = await importDocFile(importInput.files[0]);
+      await ensureFantasyEngineSource();
       applyTheme();
       doc.league ? renderBoardScreen() : renderWizard();
     } catch (e) { alert(e.message); }
