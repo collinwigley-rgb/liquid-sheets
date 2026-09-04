@@ -1304,7 +1304,13 @@ consensus. A run is labeled `FantasyEngine + Sleeper fallback` and records
 both source dates.
 
 Existing saved Money_Talks boards with only the Sleeper source are backfilled
-on load, which appends the first FantasyEngine-backed run and makes it current.
+on load or backup import, which appends the first FantasyEngine-backed run and
+makes it current.
+
+Review follow-ups keep the generated FantasyEngine source out of non-Money_Talks
+runs even though projection storage is app-wide, and key full-replacement
+coverage by player and position. The latter preserves Sleeper fallback rows for
+multi-position players when FantasyEngine covers only one eligible position.
 
 FantasyEngine's rows use its raw stat vocabulary, so `FE_STAT_MAP` and
 `FE_SAME_KEYS` map the source into the engine schema before Money_Talks
