@@ -887,10 +887,10 @@ function makeFantasyEngineSource() {
   return { as_of: FANTASYENGINE_AS_OF, players };
 }
 
-/* Option 1 from issue #11: a FantasyEngine-covered player must have exactly
- * one projection line. Keep the stored source data intact, but filter every
- * fallback source only while building this run so a later source cannot
- * accidentally average Rotowire back into FantasyEngine's consensus. */
+/* Option 1 from issue #11: a FantasyEngine-covered player-position row must
+ * have exactly one projection line. Keep the stored source data intact, but
+ * filter every fallback source only while building this run so a later source
+ * cannot accidentally average Rotowire back into FantasyEngine's consensus. */
 function sourcesForRun() {
   const sources = doc.sources || {};
   if (!sources.fantasyengine) return sources;
@@ -899,12 +899,13 @@ function sourcesForRun() {
       .filter(([name]) => name !== "fantasyengine"));
   }
   const covered = new Set((sources.fantasyengine.players || [])
-    .map((p) => p.player_id));
+    .map((p) => `${p.player_id}|${p.pos}`));
   const out = { fantasyengine: sources.fantasyengine };
   for (const [name, source] of Object.entries(sources)) {
     if (name === "fantasyengine") continue;
     out[name] = { ...source,
-      players: (source.players || []).filter((p) => !covered.has(p.player_id)) };
+      players: (source.players || [])
+        .filter((p) => !covered.has(`${p.player_id}|${p.pos}`)) };
   }
   return out;
 }
