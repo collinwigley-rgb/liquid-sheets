@@ -1070,3 +1070,39 @@ correctly reverts the board to the untouched real journal (verified the
 QB/RB/WR/TE progress counters returned to their pre-mock real values,
 not zeroed or blended). `node --check` clean on all three touched JS
 files, ASCII-only grep clean on all four touched files. Bumped V77 -> V78.
+
+---
+
+## 2026-09-04 -- Price-paid history (with orange K for keeper years) in PLAYER tab and THE BLOCK
+
+Collin: "pull the price paid every year for the player. Flag if it was a
+keeper year price with an orange K." Draft day -- built and shipped fast.
+
+New `scripts/generate_player_history.mjs`, same pattern as
+`generate_money_talks_config.mjs`: walks the real league's own
+`previous_league_id` chain (verified live: 1389342583871766528 (2026) ->
+...(2025)... -> 717428145615089664 (2021) -> null, 5 completed seasons),
+pulls each season's draft picks, and bakes `player_id -> [{year, price,
+keeper}]` into a new generated file `app/player_history.js` (442 players,
+45KB). Historical seasons never change, so this is baked in at build
+time like the league config, not fetched live during the draft.
+
+`historyFor(pid)` / `historyHtml(pid)` (app.js) strip the `sl:` prefix and
+look up the table; both PLAYER tab and THE BLOCK render the same compact
+line ("'24 $10  '25 $10 [K]") when a player has any history, and render
+nothing when he doesn't (rookies, non-Sleeper imports) -- verified both
+paths live (Bo Nix: $10 in 2024, kept at $10 in 2025, orange K correctly
+on the 2025 entry only; a fake/unknown player_id cleanly returns no row).
+
+Also fixed while touching sw.js: `app.js` statically imports
+`live_draft.js`, `money_talks_config.js`, and now `player_history.js` --
+none of the first two were in the service worker's SHELL precache list,
+meaning any one of them failing to fetch on a fresh or offline load would
+have broken app.js's entire module graph (ES static imports are all-or-
+nothing). All three added to SHELL now, closing a real pre-existing gap
+against the offline-survival requirement, not just covering the new file.
+
+Verified: `node --check` clean on all touched/generated files, ASCII-only
+grep clean. Live-tested on a wiped local IndexedDB (fresh Money_Talks
+quick-start) rather than the stale multi-hour test journal accumulated
+earlier tonight, to get a clean signal. Bumped V78 -> V79.

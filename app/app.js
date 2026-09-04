@@ -18,6 +18,7 @@ import { myPlanState, planFit, defaultPlan } from "./plan.js";
 import { AI_ENABLED, AI_ENDPOINT } from "./config.js";
 import { MONEY_TALKS_LEAGUE } from "./money_talks_config.js";
 import { pollDraft, fetchDraftStatus, parseDraftId } from "./live_draft.js";
+import { PLAYER_HISTORY } from "./player_history.js";
 
 let doc = null;
 let liveSyncStop = null;   // stop() from pollDraft(), non-null only while live sync is on
@@ -794,6 +795,20 @@ function rawStatsFor(pid, pos) {
   return null;
 }
 
+/* Real price paid for this player in past Money_Talks seasons (2021-2025,
+ * see scripts/generate_player_history.mjs -- baked in, not fetched live,
+ * since past seasons never change). Keyed by raw Sleeper player_id, so
+ * only Sleeper-sourced players (id "sl:<id>") have history; anyone else
+ * gets []. Chronological, oldest first. */
+function historyFor(pid) {
+  const m = /^sl:(\d+)$/.exec(pid);
+  return m ? (PLAYER_HISTORY[m[1]] || []) : [];
+}
+function historyHtml(pid) {
+  return historyFor(pid).map((r) => `<span class="hist-yr">'${String(r.year).slice(2)} $${r.price}`
+    + `${r.keeper ? `<b class="hist-k" title="kept at this price, not auctioned">K</b>` : ""}</span>`).join("");
+}
+
 const STAT_ORDER = [
   "pass_atts", "completions", "pass_yds", "pass_tds", "ints",
   "rush_atts", "rush_yds", "rush_tds",
@@ -830,6 +845,7 @@ function renderPlayerTab() {
   }
   const p = picked;
   const stats = rawStatsFor(p.id, p.pos);
+  const hist = historyHtml(p.id);
   const rows = stats
     ? STAT_ORDER.filter((k) => stats[k] != null)
       .map((k) => `<tr><td>${STAT_LABELS[k]}</td><td>${stats[k]}</td></tr>`).join("")
@@ -840,6 +856,7 @@ function renderPlayerTab() {
       <span class="tm">${p.pos} ${p.team || ""}</span>
       ${p.pts != null ? `<span class="ptab-pts">${p.pts.toFixed ? p.pts.toFixed(1) : p.pts} pts <small>(this league's scoring)</small></span>` : ""}
     </div>
+    ${hist ? `<div class="ptab-hist" title="what he actually sold for in past Money_Talks seasons; orange K = kept at that price, not auctioned">${hist}</div>` : ""}
     ${rows
       ? `<table class="ptab-table"><tbody>${rows}</tbody></table>`
       : `<div class="ptab-empty">No projection stat line available for ${escHtml(p.name)}.</div>`}`;
@@ -2193,6 +2210,10 @@ function renderBlock() {
   if (!picked) { block.classList.remove("show"); return; }
   const p = picked;
   const a = advise(p);
+  const hist = historyHtml(p.id);
+  const histRow = hist
+    ? `<div class="blk-row blk-hist" title="what he actually sold for in past Money_Talks seasons; orange K = kept at that price, not auctioned">${hist}</div>`
+    : "";
 
   let scaleRow = "", heroRow = "";
   if (p.usd != null) {
@@ -2301,6 +2322,7 @@ function renderBlock() {
         ${ceilLine}
         ${a.est ? `<div class="cest">room bids <b>~$${a.est}</b></div>` : ""}
       </div>
+      ${histRow}
       ${heroRow}
       ${budgetRow}
       ${slotRows ? `<div class="blk-row">${slotRows}</div>` : ""}

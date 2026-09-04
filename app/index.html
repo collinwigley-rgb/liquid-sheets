@@ -398,6 +398,12 @@ header{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;
 .cceil b{font-family:var(--mono);font-size:15px;color:var(--text)}
 .cceil small{color:var(--faint);font-size:11.5px}
 .blk-reasons{margin:0;padding-left:16px}
+.blk-hist{display:flex;flex-wrap:wrap;gap:10px;
+  font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.hist-yr{white-space:nowrap}
+.hist-k{display:inline-block;margin-left:2px;color:#fff;background:#e07b00;
+  border-radius:3px;font-size:9px;font-weight:700;line-height:1;
+  padding:2px 3px;vertical-align:2px}
 .blk-reasons li{font-size:12.5px;color:var(--muted);margin:3px 0;line-height:1.4}
 #saleform{margin-top:10px}   /* always on screen (V55): price, roster, owners, DRAFT */
 #salegrid{display:grid;grid-template-columns:1fr 25%;gap:10px;margin-top:6px;
@@ -624,6 +630,8 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
 .ptab-table td{padding:5px 16px 5px 0;border-bottom:1px solid var(--line-soft)}
 .ptab-table td:first-child{color:var(--faint);letter-spacing:.08em}
 .ptab-table td:last-child{font-weight:700;text-align:right}
+.ptab-hist{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;
+  font-family:var(--mono);font-size:12px;color:var(--muted)}
 #teams{background:var(--ground);padding:10px;overflow-x:auto}
 #tgrid{display:flex;gap:8px;min-width:max-content}
 .tcol{width:148px;flex:0 0 148px}
@@ -924,7 +932,7 @@ textarea{width:100%;font:inherit;padding:8px;border:1px solid var(--line);
       <button id="menuSleeper" class="gact">Import Sleeper values</button>
       <button id="menuReset" class="gact gdanger">Clear all sales</button>
       <div class="gdiv"></div>
-      <div class="ver gver">V78</div>
+      <div class="ver gver">V79</div>
     </div>
   </span>
 </header>
