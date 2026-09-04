@@ -1284,3 +1284,38 @@ blind ~13 hours from a real draft. FantasyEngine's consensus is
 reference data in the PLAYER tab only for now. If My$ itself should
 pull from FantasyEngine, that is a deliberate, separate, larger change
 requiring its own validation pass, not a fast-follow to this one.
+
+## 2026-09-04 -- My$ uses FantasyEngine consensus with Sleeper fallback
+
+This supersedes the final "Not done tonight" note above, which was written
+before the crosswalk and freshness questions were answered in FantasyEngine
+issue #84.
+
+Issue #11's decision is implemented: for the Money_Talks league, the board
+uses FantasyEngine's multi-site consensus projection for every player in the
+matched 2026 release (1206 rows). Sleeper's current Rotowire projection is
+retained only for players FantasyEngine does not cover (about 51 rows).
+
+The two sources remain stored separately, but the run-time source map filters
+every fallback source's FantasyEngine-covered player before calling the
+existing `blendProjections` function. This preserves the existing source
+plumbing without averaging Rotowire back into FantasyEngine's already-blended
+consensus. A run is labeled `FantasyEngine + Sleeper fallback` and records
+both source dates.
+
+Existing saved Money_Talks boards with only the Sleeper source are backfilled
+on load, which appends the first FantasyEngine-backed run and makes it current.
+
+FantasyEngine's rows use its raw stat vocabulary, so `FE_STAT_MAP` and
+`FE_SAME_KEYS` map the source into the engine schema before Money_Talks
+scoring. The mapping includes `idp_pd` and `idp_td`, which are real
+FantasyEngine fields for scoring pass defenses and defensive touchdowns even
+though they remain outside the PLAYER tab's current display list. The
+generated artifact is intentionally used as a
+build-time snapshot because FantasyEngine's public API has no CORS headers.
+The snapshot is the 2026-08-30 release, confirmed by FantasyEngine issue #84
+to be the freshest available projection data before the draft.
+
+Verification required for this change: compare old and new My$ values across
+multiple positions, then run `node --check` on touched JavaScript and keep
+the app and service-worker versions in sync.

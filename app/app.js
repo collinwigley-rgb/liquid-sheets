@@ -156,6 +156,7 @@ async function switchLeague(id) {
   if (doc && doc.id != null) await saveDoc(doc);
   await setActive(id);
   doc = await loadDoc();
+  await ensureFantasyEngineSource();
   pendingNewFrom = null;
   resetDerivedState(); applyTheme();
   if (doc && doc.league) renderBoardScreen(); else renderWizard();
@@ -682,6 +683,9 @@ async function doFetchSleeper() {
     throw new Error("Sleeper returned no projections right now. Try again in a moment, or import your own.");
   }
   doc.sources.sleeper = { as_of, players };
+  if (isMoneyTalksLeague()) {
+    doc.sources.fantasyengine = makeFantasyEngineSource();
+  }
   doc.kdef = { as_of, players: kdef };
   Object.assign(doc.names, names);
   Object.assign(doc.player_meta, meta);
@@ -690,14 +694,16 @@ async function doFetchSleeper() {
 
 async function makeRun() {
   const cfg = doc.league;
-  const sourceNames = Object.keys(doc.sources);
+  const sources = sourcesForRun();
+  const sourceNames = Object.keys(sources);
   if (!sourceNames.length) return;
   let asOf, players, label;
   if (sourceNames.length > 1) {
-    ({ asOf, players } = blendProjections(doc.sources, cfg.scoring));
-    label = "blend";
+    ({ asOf, players } = blendProjections(sources, cfg.scoring));
+    label = sourceNames.includes("fantasyengine")
+      ? "FantasyEngine + Sleeper fallback" : "blend";
   } else {
-    const s = doc.sources[sourceNames[0]];
+    const s = sources[sourceNames[0]];
     asOf = `${sourceNames[0]}@${s.as_of}`;
     players = s.players;
     label = sourceNames[0];
@@ -840,19 +846,78 @@ const STAT_LABELS = {
 /* FantasyEngine's projection_summary uses its own raw key names (a third
  * vocabulary, distinct from both Sleeper's and this app's STAT_ORDER --
  * verified live 2026-09-04 against real rows) -- same-name keys pass
- * through unchanged, everything else needs the explicit map below. Only
- * the STAT_ORDER-relevant keys are mapped; FantasyEngine's own
- * complementary categories (rec_100_yds, pass_300_yds, idp_pd, idp_td,
- * rec_first_down, ...) are left unmapped on purpose, same reasoning as
- * STAT_ORDER's own comment above. */
+ * through unchanged, everything else needs the explicit map below. The map
+ * includes every key used by the engine's scoring functions; STAT_ORDER still
+ * controls which rows the PLAYER tab displays. Bonus-only categories
+ * (rec_100_yds, pass_300_yds, rec_first_down, ...) remain unmapped. */
 const FE_STAT_MAP = {
   pass_att: "pass_atts", pass_comp: "completions", pass_int: "ints",
   rush_att: "rush_atts", rec: "receptions",
   idp_solo: "tkl_solo", idp_asst: "tkl_ast", idp_sack: "sacks",
   idp_int: "def_ints", idp_fum_force: "forced_fumbles",
+  idp_fum_rec: "fum_rec",
+  idp_pd: "pass_def", idp_td: "def_tds",
 };
 const FE_SAME_KEYS = ["pass_yds", "pass_tds", "rush_yds", "rush_tds",
   "rec_yds", "rec_tds", "fumbles_lost", "fum_rec"];
+
+/* The generated FantasyEngine artifact is a 2026 Money_Talks snapshot, so it
+ * is only introduced for that league. The release date is part of the
+ * generated file header and is repeated here for the source metadata stored
+ * with each run. */
+const FANTASYENGINE_AS_OF = "2026-08-30";
+
+function isMoneyTalksLeague() {
+  return String(doc?.league?.sleeper_league_id ?? "") ===
+    String(MONEY_TALKS_LEAGUE.sleeper_league_id);
+}
+
+function makeFantasyEngineSource() {
+  const players = Object.entries(FANTASYENGINE_PROJECTIONS).map(([id, row]) => {
+    const stats = {};
+    for (const [theirs, ours] of Object.entries(FE_STAT_MAP)) {
+      if (row.stats[theirs] != null) stats[ours] = row.stats[theirs];
+    }
+    for (const k of FE_SAME_KEYS) {
+      if (row.stats[k] != null) stats[k] = row.stats[k];
+    }
+    return { player_id: `sl:${id}`, pos: row.position,
+      team: row.team ?? null, stats };
+  }).filter((p) => Object.keys(p.stats).length);
+  return { as_of: FANTASYENGINE_AS_OF, players };
+}
+
+/* Option 1 from issue #11: a FantasyEngine-covered player must have exactly
+ * one projection line. Keep the stored source data intact, but filter every
+ * fallback source only while building this run so a later source cannot
+ * accidentally average Rotowire back into FantasyEngine's consensus. */
+function sourcesForRun() {
+  const sources = doc.sources || {};
+  if (!isMoneyTalksLeague() || !sources.fantasyengine) return sources;
+  const covered = new Set((sources.fantasyengine.players || [])
+    .map((p) => p.player_id));
+  const out = { fantasyengine: sources.fantasyengine };
+  for (const [name, source] of Object.entries(sources)) {
+    if (name === "fantasyengine") continue;
+    out[name] = { ...source,
+      players: (source.players || []).filter((p) => !covered.has(p.player_id)) };
+  }
+  return out;
+}
+
+/* Existing saved Money_Talks boards predate the board integration and may
+ * have only the Sleeper source. Backfill the immutable generated source once
+ * on load so the first board shown after an app update uses the new valuation
+ * without requiring another quick-start action. */
+async function ensureFantasyEngineSource() {
+  if (!doc?.sources?.sleeper || !isMoneyTalksLeague() ||
+      doc.sources.fantasyengine) return false;
+  doc.sources.fantasyengine = makeFantasyEngineSource();
+  await makeRun();
+  doc.ui.run = null;
+  await saveDoc(doc);
+  return true;
+}
 
 /* FantasyEngine's real multi-site consensus projection (2026, current
  * release -- see scripts/generate_fantasyengine_projections.mjs), mapped
@@ -3231,6 +3296,7 @@ async function boot() {
     navigator.serviceWorker.register("sw.js").catch(() => {});
   }
   doc = await loadDoc();
+  await ensureFantasyEngineSource();
   applyTheme();
   onSaved(() => { refreshSaveStatus(); autosaveToFile(); });
   requestPersist().then((ok) => { persisted = ok; refreshSaveStatus(); });
